@@ -16,9 +16,17 @@ from ldm.util import instantiate_from_config
 from ldm.models.diffusion.ddim import DDIMSampler
 from ldm.models.diffusion.plms import PLMSSampler
 
+import io
 from flask import Flask, request, send_file, make_response, abort
 
 app = Flask(__name__)
+
+def mkResponse(data):
+  return send_file(
+    data,
+    download_name="image.png",
+    mimetype="image/png",
+  )
 
 def chunk(it, size):
     it = iter(it)
@@ -186,7 +194,7 @@ def home():
 
         opt = parser.parse_args([
             '--prompt',
-            'anime girl'
+            opt.prompt,
             '--plms',
             '--ckpt',
             'stable-diffusion-v-1-3/sd-v1-3-full-ema.ckpt',
@@ -269,9 +277,21 @@ def home():
                             if not opt.skip_save:
                                 for x_sample in x_samples_ddim:
                                     x_sample = 255. * rearrange(x_sample.cpu().numpy(), 'c h w -> h w c')
-                                    Image.fromarray(x_sample.astype(np.uint8)).save(
-                                        os.path.join(sample_path, f"{base_count:05}.png"))
+                                    # Image.fromarray(x_sample.astype(np.uint8)).save(
+                                    #     os.path.join(sample_path, f"{base_count:05}.png"))
+                                    img = Image.fromarray(x_sample.astype(np.uint8))
                                     base_count += 1
+
+                                    img_byte_arr = io.BytesIO()
+                                    img.save(img_byte_arr, format='PNG')
+                                    img_byte_arr.seek(0)
+
+                                    response = mkResponse(img_byte_arr)
+
+                                    response.headers["Access-Control-Allow-Origin"] = "*"
+                                    response.headers["Access-Control-Allow-Headers"] = "*"
+                                    response.headers["Access-Control-Allow-Methods"] = "*"
+                                    return response
 
                             if not opt.skip_grid:
                                 all_samples.append(x_samples_ddim)
@@ -289,8 +309,10 @@ def home():
 
                     toc = time.time()
 
-        print(f"Your samples are ready and waiting for you here: \n{outpath} \n"
-            f" \nEnjoy.")
+        # print(f"Your samples are ready and waiting for you here: \n{outpath} \n"
+        #     f" \nEnjoy.")
+        response = make_response("no result", 500)
+        return response
 
 
 # if __name__ == "__main__":
