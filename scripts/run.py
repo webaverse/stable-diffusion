@@ -223,16 +223,6 @@ outpath = opt.outdir
 
 batch_size = opt.n_samples
 n_rows = opt.n_rows if opt.n_rows > 0 else batch_size
-if not opt.from_file:
-    prompt = s
-    assert prompt is not None
-    data = [batch_size * [prompt]]
-
-else:
-    print(f"reading prompts from {opt.from_file}")
-    with open(opt.from_file, "r") as f:
-        data = f.read().splitlines()
-        data = list(chunk(data, batch_size))
 
 sample_path = os.path.join(outpath, "samples")
 os.makedirs(sample_path, exist_ok=True)
@@ -254,6 +244,18 @@ def home():
     if s is None or s == "":
         response = make_response("no text provided", 400)
     else:
+      data = None
+      if not opt.from_file:
+          prompt = s
+          assert prompt is not None
+          data = [batch_size * [prompt]]
+
+      else:
+          print(f"reading prompts from {opt.from_file}")
+          with open(opt.from_file, "r") as f:
+              data = f.read().splitlines()
+              data = list(chunk(data, batch_size))
+
         precision_scope = autocast if opt.precision=="autocast" else nullcontext
         with torch.no_grad():
             with precision_scope("cuda"):
