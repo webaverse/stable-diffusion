@@ -194,7 +194,7 @@ def home():
 
         opt = parser.parse_args([
             '--prompt',
-            opt.prompt,
+            s,
             '--plms',
             '--ckpt',
             'stable-diffusion-v-1-3/sd-v1-3-full-ema.ckpt',
