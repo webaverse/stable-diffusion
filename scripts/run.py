@@ -246,7 +246,11 @@ if opt.fixed_code:
 
 # img2img
 
-samplerMod = samplerImage
+if opt.plms:
+    samplerMod = PLMSSampler(model)
+else:
+    samplerMod = DDIMSampler(model)
+
 samplerMod.make_schedule(ddim_num_steps=opt.ddim_steps, ddim_eta=opt.ddim_eta, verbose=False)
 
 assert 0. <= opt.strength <= 1., 'can only work with strength in [0.0, 1.0]'
