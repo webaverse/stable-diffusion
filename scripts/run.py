@@ -224,10 +224,10 @@ outpath = opt.outdir
 batch_size = opt.n_samples
 n_rows = opt.n_rows if opt.n_rows > 0 else batch_size
 
-sample_path = os.path.join(outpath, "samples")
-os.makedirs(sample_path, exist_ok=True)
-base_count = len(os.listdir(sample_path))
-grid_count = len(os.listdir(outpath)) - 1
+# sample_path = os.path.join(outpath, "samples")
+# os.makedirs(sample_path, exist_ok=True)
+# base_count = len(os.listdir(sample_path))
+# grid_count = len(os.listdir(outpath)) - 1
 
 start_code = None
 if opt.fixed_code:
@@ -255,6 +255,9 @@ def home():
             with open(opt.from_file, "r") as f:
                 data = f.read().splitlines()
                 data = list(chunk(data, batch_size))
+        
+        base_count = 0
+        grid_count = 0
 
         precision_scope = autocast if opt.precision=="autocast" else nullcontext
         with torch.no_grad():
