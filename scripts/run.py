@@ -53,11 +53,12 @@ def load_model_from_config(config, ckpt, verbose=False):
     return model
 
 #
-# load model
+# arguments
 #
 
 parser = argparse.ArgumentParser()
 
+# txt2img
 parser.add_argument(
     "--prompt",
     type=str,
@@ -188,6 +189,20 @@ parser.add_argument(
     default="autocast"
 )
 
+# img2img
+parser.add_argument(
+    "--init-img",
+    type=str,
+    nargs="?",
+    help="path to the input image"
+)
+parser.add_argument(
+    "--strength",
+    type=float,
+    default=0.75,
+    help="strength for noising/unnoising. 1.0 corresponds to full destruction of information in init image",
+)
+
 opt = parser.parse_args([
     '--prompt',
     'anime girl',
@@ -214,9 +229,9 @@ device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cp
 model = model.to(device)
 
 if opt.plms:
-    sampler = PLMSSampler(model)
+    samplerImage = PLMSSampler(model)
 else:
-    sampler = DDIMSampler(model)
+    samplerImage = DDIMSampler(model)
 
 os.makedirs(opt.outdir, exist_ok=True)
 outpath = opt.outdir
@@ -224,21 +239,186 @@ outpath = opt.outdir
 batch_size = opt.n_samples
 n_rows = opt.n_rows if opt.n_rows > 0 else batch_size
 
-# sample_path = os.path.join(outpath, "samples")
-# os.makedirs(sample_path, exist_ok=True)
-# base_count = len(os.listdir(sample_path))
-# grid_count = len(os.listdir(outpath)) - 1
-
 start_code = None
 if opt.fixed_code:
     start_code = torch.randn([opt.n_samples, opt.C, opt.H // opt.f, opt.W // opt.f], device=device)
 
+# img2img
+
+if opt.plms:
+    samplerMod = PLMSSampler(model)
+else:
+    samplerMod = DDIMSampler(model)
+
+samplerMod.make_schedule(ddim_num_steps=opt.ddim_steps, ddim_eta=opt.ddim_eta, verbose=False)
+
+assert 0. <= opt.strength <= 1., 'can only work with strength in [0.0, 1.0]'
+t_enc = int(opt.strength * opt.ddim_steps)
+print(f"target t_enc is {t_enc} steps")
+
 #
-# request handler
+# methods
+#
+
+def load_img(postData):
+    image = Image.open(io.BytesIO(postData)).convert("RGB")
+    w, h = image.size
+    print(f"loaded input image of size ({w}, {h}) from {path}")
+    w, h = map(lambda x: x - x % 32, (w, h))  # resize to integer multiple of 32
+    image = image.resize((w, h), resample=PIL.Image.LANCZOS)
+    image = np.array(image).astype(np.float32) / 255.0
+    image = image[None].transpose(0, 3, 1, 2)
+    image = torch.from_numpy(image)
+    return 2.*image - 1.
+
+def renderImage(data):
+    base_count = 0
+    grid_count = 0
+
+    precision_scope = autocast if opt.precision=="autocast" else nullcontext
+    with torch.no_grad():
+        with precision_scope("cuda"):
+            with model.ema_scope():
+                tic = time.time()
+                all_samples = list()
+                for n in trange(opt.n_iter, desc="Sampling"):
+                    for prompts in tqdm(data, desc="data"):
+                        uc = None
+                        if opt.scale != 1.0:
+                            uc = model.get_learned_conditioning(batch_size * [""])
+                        if isinstance(prompts, tuple):
+                            prompts = list(prompts)
+                        c = model.get_learned_conditioning(prompts)
+                        shape = [opt.C, opt.H // opt.f, opt.W // opt.f]
+                        samples_ddim, _ = samplerImage.sample(S=opt.ddim_steps,
+                                                        conditioning=c,
+                                                        batch_size=opt.n_samples,
+                                                        shape=shape,
+                                                        verbose=False,
+                                                        unconditional_guidance_scale=opt.scale,
+                                                        unconditional_conditioning=uc,
+                                                        eta=opt.ddim_eta,
+                                                        x_T=start_code)
+
+                        x_samples_ddim = model.decode_first_stage(samples_ddim)
+                        x_samples_ddim = torch.clamp((x_samples_ddim + 1.0) / 2.0, min=0.0, max=1.0)
+
+                        if not opt.skip_save:
+                            for x_sample in x_samples_ddim:
+                                x_sample = 255. * rearrange(x_sample.cpu().numpy(), 'c h w -> h w c')
+                                # Image.fromarray(x_sample.astype(np.uint8)).save(
+                                #     os.path.join(sample_path, f"{base_count:05}.png"))
+                                img = Image.fromarray(x_sample.astype(np.uint8))
+                                base_count += 1
+
+                                img_byte_arr = io.BytesIO()
+                                img.save(img_byte_arr, format='PNG')
+                                img_byte_arr.seek(0)
+
+                                response = mkResponse(img_byte_arr)
+
+                                response.headers["Access-Control-Allow-Origin"] = "*"
+                                response.headers["Access-Control-Allow-Headers"] = "*"
+                                response.headers["Access-Control-Allow-Methods"] = "*"
+                                return response
+
+                        if not opt.skip_grid:
+                            all_samples.append(x_samples_ddim)
+
+                if not opt.skip_grid:
+                    # additionally, save as grid
+                    grid = torch.stack(all_samples, 0)
+                    grid = rearrange(grid, 'n b c h w -> (n b) c h w')
+                    grid = make_grid(grid, nrow=n_rows)
+
+                    # to image
+                    grid = 255. * rearrange(grid, 'c h w -> h w c').cpu().numpy()
+                    Image.fromarray(grid.astype(np.uint8)).save(os.path.join(outpath, f'grid-{grid_count:04}.png'))
+                    grid_count += 1
+
+                toc = time.time()
+
+    # print(f"Your samples are ready and waiting for you here: \n{outpath} \n"
+    #     f" \nEnjoy.")
+    response = make_response("no result", 500)
+    return response
+
+def renderMod(data):
+    base_count = 0
+    grid_count = 0
+
+    init_image = load_img(postData).to(device)
+    init_image = repeat(init_image, '1 ... -> b ...', b=batch_size)
+    init_latent = model.get_first_stage_encoding(model.encode_first_stage(init_image))  # move to latent space
+
+    precision_scope = autocast if opt.precision == "autocast" else nullcontext
+    with torch.no_grad():
+        with precision_scope("cuda"):
+            with model.ema_scope():
+                tic = time.time()
+                all_samples = list()
+                for n in trange(opt.n_iter, desc="Sampling"):
+                    for prompts in tqdm(data, desc="data"):
+                        uc = None
+                        if opt.scale != 1.0:
+                            uc = model.get_learned_conditioning(batch_size * [""])
+                        if isinstance(prompts, tuple):
+                            prompts = list(prompts)
+                        c = model.get_learned_conditioning(prompts)
+
+                        # encode (scaled latent)
+                        z_enc = samplerMod.stochastic_encode(init_latent, torch.tensor([t_enc]*batch_size).to(device))
+                        # decode it
+                        samples = samplerMod.decode(z_enc, c, t_enc, unconditional_guidance_scale=opt.scale,
+                                                 unconditional_conditioning=uc,)
+
+                        x_samples = model.decode_first_stage(samples)
+                        x_samples = torch.clamp((x_samples + 1.0) / 2.0, min=0.0, max=1.0)
+
+                        if not opt.skip_save:
+                            for x_sample in x_samples:
+                                x_sample = 255. * rearrange(x_sample.cpu().numpy(), 'c h w -> h w c')
+                                # Image.fromarray(x_sample.astype(np.uint8)).save(
+                                #     os.path.join(sample_path, f"{base_count:05}.png"))
+                                img = Image.fromarray(x_sample.astype(np.uint8))
+                                base_count += 1
+
+                                img_byte_arr = io.BytesIO()
+                                img.save(img_byte_arr, format='PNG')
+                                img_byte_arr.seek(0)
+
+                                response = mkResponse(img_byte_arr)
+
+                                response.headers["Access-Control-Allow-Origin"] = "*"
+                                response.headers["Access-Control-Allow-Headers"] = "*"
+                                response.headers["Access-Control-Allow-Methods"] = "*"
+                                return response
+                        all_samples.append(x_samples)
+
+                if not opt.skip_grid:
+                    # additionally, save as grid
+                    grid = torch.stack(all_samples, 0)
+                    grid = rearrange(grid, 'n b c h w -> (n b) c h w')
+                    grid = make_grid(grid, nrow=n_rows)
+
+                    # to image
+                    grid = 255. * rearrange(grid, 'c h w -> h w c').cpu().numpy()
+                    Image.fromarray(grid.astype(np.uint8)).save(os.path.join(outpath, f'grid-{grid_count:04}.png'))
+                    grid_count += 1
+
+                toc = time.time()
+
+    # print(f"Your samples are ready and waiting for you here: \n{outpath} \n"
+    #       f" \nEnjoy.")
+    response = make_response("no result", 500)
+    return response
+    
+#
+# request handlers
 #
 
 @app.route("/image")
-def home():
+def image():
     s = request.args.get("s")
     response = None
     if s is None or s == "":
@@ -255,78 +435,31 @@ def home():
             with open(opt.from_file, "r") as f:
                 data = f.read().splitlines()
                 data = list(chunk(data, batch_size))
-        
-        base_count = 0
-        grid_count = 0
 
-        precision_scope = autocast if opt.precision=="autocast" else nullcontext
-        with torch.no_grad():
-            with precision_scope("cuda"):
-                with model.ema_scope():
-                    tic = time.time()
-                    all_samples = list()
-                    for n in trange(opt.n_iter, desc="Sampling"):
-                        for prompts in tqdm(data, desc="data"):
-                            uc = None
-                            if opt.scale != 1.0:
-                                uc = model.get_learned_conditioning(batch_size * [""])
-                            if isinstance(prompts, tuple):
-                                prompts = list(prompts)
-                            c = model.get_learned_conditioning(prompts)
-                            shape = [opt.C, opt.H // opt.f, opt.W // opt.f]
-                            samples_ddim, _ = sampler.sample(S=opt.ddim_steps,
-                                                            conditioning=c,
-                                                            batch_size=opt.n_samples,
-                                                            shape=shape,
-                                                            verbose=False,
-                                                            unconditional_guidance_scale=opt.scale,
-                                                            unconditional_conditioning=uc,
-                                                            eta=opt.ddim_eta,
-                                                            x_T=start_code)
+        return renderImage(data)
 
-                            x_samples_ddim = model.decode_first_stage(samples_ddim)
-                            x_samples_ddim = torch.clamp((x_samples_ddim + 1.0) / 2.0, min=0.0, max=1.0)
+@app.route("/mod", methods=["POST"])
+def reimage():
+    s = request.args.get("s")
+    response = None
+    if s is None or s == "":
+        response = make_response("no text provided", 400)
+    else:
+        postData = request.get_data()
 
-                            if not opt.skip_save:
-                                for x_sample in x_samples_ddim:
-                                    x_sample = 255. * rearrange(x_sample.cpu().numpy(), 'c h w -> h w c')
-                                    # Image.fromarray(x_sample.astype(np.uint8)).save(
-                                    #     os.path.join(sample_path, f"{base_count:05}.png"))
-                                    img = Image.fromarray(x_sample.astype(np.uint8))
-                                    base_count += 1
+        data = None
+        if not opt.from_file:
+            prompt = s
+            assert prompt is not None
+            data = [batch_size * [prompt]]
 
-                                    img_byte_arr = io.BytesIO()
-                                    img.save(img_byte_arr, format='PNG')
-                                    img_byte_arr.seek(0)
+        else:
+            print(f"reading prompts from {opt.from_file}")
+            with open(opt.from_file, "r") as f:
+                data = f.read().splitlines()
+                data = list(chunk(data, batch_size))
 
-                                    response = mkResponse(img_byte_arr)
-
-                                    response.headers["Access-Control-Allow-Origin"] = "*"
-                                    response.headers["Access-Control-Allow-Headers"] = "*"
-                                    response.headers["Access-Control-Allow-Methods"] = "*"
-                                    return response
-
-                            if not opt.skip_grid:
-                                all_samples.append(x_samples_ddim)
-
-                    if not opt.skip_grid:
-                        # additionally, save as grid
-                        grid = torch.stack(all_samples, 0)
-                        grid = rearrange(grid, 'n b c h w -> (n b) c h w')
-                        grid = make_grid(grid, nrow=n_rows)
-
-                        # to image
-                        grid = 255. * rearrange(grid, 'c h w -> h w c').cpu().numpy()
-                        Image.fromarray(grid.astype(np.uint8)).save(os.path.join(outpath, f'grid-{grid_count:04}.png'))
-                        grid_count += 1
-
-                    toc = time.time()
-
-        # print(f"Your samples are ready and waiting for you here: \n{outpath} \n"
-        #     f" \nEnjoy.")
-        response = make_response("no result", 500)
-        return response
-
+        return renderMod(data, postData)
 
 # if __name__ == "__main__":
 #     main()
