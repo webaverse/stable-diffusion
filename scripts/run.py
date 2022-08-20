@@ -192,7 +192,7 @@ def home():
             'stable-diffusion-v-1-3/sd-v1-3-full-ema.ckpt',
             '--n_samples',
             '1',
-        )
+        ])
 
         if opt.laion400m:
             print("Falling back to LAION 400M model...")
