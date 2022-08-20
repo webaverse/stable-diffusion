@@ -343,7 +343,7 @@ def renderImage(data):
     response = make_response("no result", 500)
     return response
 
-def renderMod(data):
+def renderMod(data, postData):
     base_count = 0
     grid_count = 0
 
