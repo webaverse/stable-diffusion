@@ -263,7 +263,7 @@ print(f"target t_enc is {t_enc} steps")
 def load_img(postData):
     image = Image.open(io.BytesIO(postData)).convert("RGB")
     w, h = image.size
-    print(f"loaded input image of size ({w}, {h}) from {path}")
+    print(f"loaded input image of size ({w}, {h})")
     w, h = map(lambda x: x - x % 32, (w, h))  # resize to integer multiple of 32
     image = image.resize((w, h), resample=PIL.Image.LANCZOS)
     image = np.array(image).astype(np.float32) / 255.0
