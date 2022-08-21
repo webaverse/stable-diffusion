@@ -1,5 +1,5 @@
 import argparse, os, sys, glob
-import Namespace from argparse
+from argparse import Namespace
 import PIL
 import torch
 import numpy as np
