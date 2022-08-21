@@ -576,6 +576,7 @@ def reimage():
         localOpt = Namespace(**vars(opt2))
         localOpt.ddim_steps = request.args.get("n", default=localOpt.ddim_steps, type=int)
         localOpt.strength = request.args.get("noise", default=localOpt.strength, type=float)
+        print(f'got n: {request.args.get("n", default=7, type=int)}')
         return renderMod(data, postData, localOpt)
 
 # if __name__ == "__main__":
