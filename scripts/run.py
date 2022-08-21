@@ -552,7 +552,7 @@ def renderMod(data, postData):
 # request handlers
 #
 
-@app.route("/image")
+@app.route("/image", methods=["GET", "OPTIONS"])
 def image():
     if request.method == "OPTIONS":
         response = make_response("", 200)
@@ -580,7 +580,7 @@ def image():
 
         return renderImage(data)
 
-@app.route("/mod", methods=["POST"])
+@app.route("/mod", methods=["POST", "OPTIONS"])
 def reimage():
     if request.method == "OPTIONS":
         response = make_response("", 200)
