@@ -579,7 +579,7 @@ def reimage():
                 data = f.read().splitlines()
                 data = list(chunk(data, batch_size))
 
-        localOpt = opt.copy()
+        localOpt = opt2.copy()
         localOpt.ddim_steps = request.args.get("n", default=localOpt.ddim_steps, type=int)
         localOpt.strength = request.args.get("noise", default=localOpt.strength, type=float)
         return renderMod(data, postData, localOpt)
