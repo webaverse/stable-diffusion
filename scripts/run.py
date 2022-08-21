@@ -1,4 +1,5 @@
 import argparse, os, sys, glob
+import Namespace from argparse
 import PIL
 import torch
 import numpy as np
