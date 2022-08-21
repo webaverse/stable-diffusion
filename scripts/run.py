@@ -407,8 +407,7 @@ def load_img(postData):
     return 2.*image - 1.
 
 def renderImage(data):
-    base_count = 0
-    grid_count = 0
+    # base_count = 0
 
     precision_scope = autocast if opt.precision=="autocast" else nullcontext
     with torch.no_grad():
@@ -444,7 +443,7 @@ def renderImage(data):
                                 # Image.fromarray(x_sample.astype(np.uint8)).save(
                                 #     os.path.join(sample_path, f"{base_count:05}.png"))
                                 img = Image.fromarray(x_sample.astype(np.uint8))
-                                base_count += 1
+                                # base_count += 1
 
                                 img_byte_arr = io.BytesIO()
                                 img.save(img_byte_arr, format='PNG')
@@ -457,30 +456,14 @@ def renderImage(data):
                                 response.headers["Access-Control-Allow-Methods"] = "*"
                                 return response
 
-                        if not opt.skip_grid:
-                            all_samples.append(x_samples_ddim)
-
-                if not opt.skip_grid:
-                    # additionally, save as grid
-                    grid = torch.stack(all_samples, 0)
-                    grid = rearrange(grid, 'n b c h w -> (n b) c h w')
-                    grid = make_grid(grid, nrow=n_rows)
-
-                    # to image
-                    grid = 255. * rearrange(grid, 'c h w -> h w c').cpu().numpy()
-                    Image.fromarray(grid.astype(np.uint8)).save(os.path.join(outpath, f'grid-{grid_count:04}.png'))
-                    grid_count += 1
-
-                toc = time.time()
-
     # print(f"Your samples are ready and waiting for you here: \n{outpath} \n"
     #     f" \nEnjoy.")
     response = make_response("no result", 500)
     return response
 
 def renderMod(data, postData):
-    base_count = 0
-    grid_count = 0
+    # base_count = 0
+    # grid_count = 0
 
     init_image = load_img(postData).to(device)
     init_image = repeat(init_image, '1 ... -> b ...', b=batch_size)
@@ -516,7 +499,7 @@ def renderMod(data, postData):
                                 # Image.fromarray(x_sample.astype(np.uint8)).save(
                                 #     os.path.join(sample_path, f"{base_count:05}.png"))
                                 img = Image.fromarray(x_sample.astype(np.uint8))
-                                base_count += 1
+                                # base_count += 1
 
                                 img_byte_arr = io.BytesIO()
                                 img.save(img_byte_arr, format='PNG')
@@ -528,20 +511,6 @@ def renderMod(data, postData):
                                 response.headers["Access-Control-Allow-Headers"] = "*"
                                 response.headers["Access-Control-Allow-Methods"] = "*"
                                 return response
-                        all_samples.append(x_samples)
-
-                if not opt2.skip_grid:
-                    # additionally, save as grid
-                    grid = torch.stack(all_samples, 0)
-                    grid = rearrange(grid, 'n b c h w -> (n b) c h w')
-                    grid = make_grid(grid, nrow=n_rows)
-
-                    # to image
-                    grid = 255. * rearrange(grid, 'c h w -> h w c').cpu().numpy()
-                    Image.fromarray(grid.astype(np.uint8)).save(os.path.join(outpath, f'grid-{grid_count:04}.png'))
-                    grid_count += 1
-
-                toc = time.time()
 
     # print(f"Your samples are ready and waiting for you here: \n{outpath} \n"
     #       f" \nEnjoy.")
