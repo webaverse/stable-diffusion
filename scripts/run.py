@@ -574,7 +574,7 @@ def reimage():
                 data = list(chunk(data, batch_size))
 
         localOpt = Namespace(**vars(opt2))
-        print(f'got n: {request.args.get("n", default=7, type=int)} {request.args.get("n", default=localOpt.ddim_steps, type=int)} {localOpt.ddim_steps}}')
+        print(f'got n: {request.args.get("n", default=7, type=int)} {request.args.get("n", default=localOpt.ddim_steps, type=int)} {localOpt.ddim_steps}')
         localOpt.ddim_steps = request.args.get("n", default=localOpt.ddim_steps, type=int)
         localOpt.strength = request.args.get("noise", default=localOpt.strength, type=float)
         return renderMod(data, postData, localOpt)
