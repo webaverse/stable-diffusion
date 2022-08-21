@@ -390,7 +390,7 @@ def load_img(postData):
     return 2.*image - 1.
 
 def renderImage(data, localOpt):
-    if opt.plms:
+    if localOpt.plms:
         samplerImage = PLMSSampler(model)
     else:
         samplerImage = DDIMSampler(model)
@@ -452,15 +452,15 @@ def renderMod(data, postData, localOpt):
     init_image = repeat(init_image, '1 ... -> b ...', b=batch_size)
     init_latent = model.get_first_stage_encoding(model.encode_first_stage(init_image))  # move to latent space
 
-    if opt2.plms:
+    if localOpt.plms:
         raise NotImplementedError("PLMS sampler not (yet) supported")
         samplerMod = PLMSSampler(model)
     else:
         samplerMod = DDIMSampler(model)
-    samplerMod.make_schedule(ddim_num_steps=opt2.ddim_steps, ddim_eta=opt2.ddim_eta, verbose=False)
+    samplerMod.make_schedule(ddim_num_steps=localOpt.ddim_steps, ddim_eta=localOpt.ddim_eta, verbose=False)
 
-    assert 0. <= opt2.strength <= 1., 'can only work with strength in [0.0, 1.0]'
-    t_enc = int(opt2.strength * opt2.ddim_steps)
+    assert 0. <= localOpt.strength <= 1., 'can only work with strength in [0.0, 1.0]'
+    t_enc = int(localOpt.strength * localOpt.ddim_steps)
     print(f"target t_enc is {t_enc} steps")
 
     precision_scope = autocast if localOpt.precision == "autocast" else nullcontext
