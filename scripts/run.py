@@ -337,7 +337,7 @@ parser2.add_argument(
     default="autocast"
 )
 
-opt2 = parser.parse_args([
+opt2 = parser2.parse_args([
     '--prompt',
     'anime girl',
     "--strength",
