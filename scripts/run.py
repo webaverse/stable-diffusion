@@ -459,10 +459,9 @@ def renderMod(data, postData, localOpt):
         samplerMod = DDIMSampler(model)
     samplerMod.make_schedule(ddim_num_steps=localOpt.ddim_steps, ddim_eta=localOpt.ddim_eta, verbose=False)
 
-    # assert 0. <= localOpt.strength <= 1., 'can only work with strength in [0.0, 1.0]'
-    # t_enc = int(localOpt.strength * localOpt.ddim_steps)
-    # print(f"target t_enc is {t_enc} steps")
-    t_enc = localOpt.ddim_steps
+    assert 0. <= localOpt.strength <= 1., 'can only work with strength in [0.0, 1.0]'
+    t_enc = int(localOpt.strength * localOpt.ddim_steps)
+    print(f"target t_enc is {t_enc} steps")
 
     precision_scope = autocast if localOpt.precision == "autocast" else nullcontext
     with torch.no_grad():
@@ -575,9 +574,8 @@ def reimage():
                 data = list(chunk(data, batch_size))
 
         localOpt = Namespace(**vars(opt2))
-        print(f'got n: {request.args.get("n", default=7, type=int)} {request.args.get("n", default=localOpt.ddim_steps, type=int)} {localOpt.ddim_steps}')
         localOpt.ddim_steps = request.args.get("n", default=localOpt.ddim_steps, type=int)
-        # localOpt.strength = request.args.get("noise", default=localOpt.strength, type=float)
+        localOpt.strength = request.args.get("noise", default=localOpt.strength, type=float)
         return renderMod(data, postData, localOpt)
 
 # if __name__ == "__main__":
