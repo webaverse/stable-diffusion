@@ -364,13 +364,8 @@ model = load_model_from_config(config, f"{opt.ckpt}")
 device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
 model = model.to(device)
 
-if opt.plms:
-    samplerImage = PLMSSampler(model)
-else:
-    samplerImage = DDIMSampler(model)
-
-os.makedirs(opt.outdir, exist_ok=True)
-outpath = opt.outdir
+# os.makedirs(opt.outdir, exist_ok=True)
+# outpath = opt.outdir
 
 batch_size = opt.n_samples
 n_rows = opt.n_rows if opt.n_rows > 0 else batch_size
@@ -378,19 +373,6 @@ n_rows = opt.n_rows if opt.n_rows > 0 else batch_size
 start_code = None
 if opt.fixed_code:
     start_code = torch.randn([opt.n_samples, opt.C, opt.H // opt.f, opt.W // opt.f], device=device)
-
-# img2img
-
-if opt2.plms:
-    raise NotImplementedError("PLMS sampler not (yet) supported")
-    samplerMod = PLMSSampler(model)
-else:
-    samplerMod = DDIMSampler(model)
-samplerMod.make_schedule(ddim_num_steps=opt2.ddim_steps, ddim_eta=opt2.ddim_eta, verbose=False)
-
-assert 0. <= opt2.strength <= 1., 'can only work with strength in [0.0, 1.0]'
-t_enc = int(opt2.strength * opt2.ddim_steps)
-print(f"target t_enc is {t_enc} steps")
 
 #
 # methods
@@ -408,7 +390,10 @@ def load_img(postData):
     return 2.*image - 1.
 
 def renderImage(data, localOpt):
-    # base_count = 0
+    if opt.plms:
+        samplerImage = PLMSSampler(model)
+    else:
+        samplerImage = DDIMSampler(model)
 
     precision_scope = autocast if localOpt.precision=="autocast" else nullcontext
     with torch.no_grad():
@@ -463,12 +448,20 @@ def renderImage(data, localOpt):
     return response
 
 def renderMod(data, postData, localOpt):
-    # base_count = 0
-    # grid_count = 0
-
     init_image = load_img(postData).to(device)
     init_image = repeat(init_image, '1 ... -> b ...', b=batch_size)
     init_latent = model.get_first_stage_encoding(model.encode_first_stage(init_image))  # move to latent space
+
+    if opt2.plms:
+        raise NotImplementedError("PLMS sampler not (yet) supported")
+        samplerMod = PLMSSampler(model)
+    else:
+        samplerMod = DDIMSampler(model)
+    samplerMod.make_schedule(ddim_num_steps=opt2.ddim_steps, ddim_eta=opt2.ddim_eta, verbose=False)
+
+    assert 0. <= opt2.strength <= 1., 'can only work with strength in [0.0, 1.0]'
+    t_enc = int(opt2.strength * opt2.ddim_steps)
+    print(f"target t_enc is {t_enc} steps")
 
     precision_scope = autocast if localOpt.precision == "autocast" else nullcontext
     with torch.no_grad():
