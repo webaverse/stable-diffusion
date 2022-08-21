@@ -406,38 +406,38 @@ def load_img(postData):
     image = torch.from_numpy(image)
     return 2.*image - 1.
 
-def renderImage(data):
+def renderImage(data, localOpt):
     # base_count = 0
 
-    precision_scope = autocast if opt.precision=="autocast" else nullcontext
+    precision_scope = autocast if localOpt.precision=="autocast" else nullcontext
     with torch.no_grad():
         with precision_scope("cuda"):
             with model.ema_scope():
                 tic = time.time()
                 all_samples = list()
-                for n in trange(opt.n_iter, desc="Sampling"):
+                for n in trange(localOpt.n_iter, desc="Sampling"):
                     for prompts in tqdm(data, desc="data"):
                         uc = None
-                        if opt.scale != 1.0:
+                        if localOpt.scale != 1.0:
                             uc = model.get_learned_conditioning(batch_size * [""])
                         if isinstance(prompts, tuple):
                             prompts = list(prompts)
                         c = model.get_learned_conditioning(prompts)
-                        shape = [opt.C, opt.H // opt.f, opt.W // opt.f]
-                        samples_ddim, _ = samplerImage.sample(S=opt.ddim_steps,
+                        shape = [localOpt.C, localOpt.H // localOpt.f, localOpt.W // localOpt.f]
+                        samples_ddim, _ = samplerImage.sample(S=localOpt.ddim_steps,
                                                         conditioning=c,
-                                                        batch_size=opt.n_samples,
+                                                        batch_size=localOpt.n_samples,
                                                         shape=shape,
                                                         verbose=False,
-                                                        unconditional_guidance_scale=opt.scale,
+                                                        unconditional_guidance_scale=localOpt.scale,
                                                         unconditional_conditioning=uc,
-                                                        eta=opt.ddim_eta,
+                                                        eta=localOpt.ddim_eta,
                                                         x_T=start_code)
 
                         x_samples_ddim = model.decode_first_stage(samples_ddim)
                         x_samples_ddim = torch.clamp((x_samples_ddim + 1.0) / 2.0, min=0.0, max=1.0)
 
-                        if not opt.skip_save:
+                        if not localOpt.skip_save:
                             for x_sample in x_samples_ddim:
                                 x_sample = 255. * rearrange(x_sample.cpu().numpy(), 'c h w -> h w c')
                                 # Image.fromarray(x_sample.astype(np.uint8)).save(
@@ -461,7 +461,7 @@ def renderImage(data):
     response = make_response("no result", 500)
     return response
 
-def renderMod(data, postData):
+def renderMod(data, postData, localOpt):
     # base_count = 0
     # grid_count = 0
 
@@ -469,16 +469,16 @@ def renderMod(data, postData):
     init_image = repeat(init_image, '1 ... -> b ...', b=batch_size)
     init_latent = model.get_first_stage_encoding(model.encode_first_stage(init_image))  # move to latent space
 
-    precision_scope = autocast if opt2.precision == "autocast" else nullcontext
+    precision_scope = autocast if localOpt.precision == "autocast" else nullcontext
     with torch.no_grad():
         with precision_scope("cuda"):
             with model.ema_scope():
                 tic = time.time()
                 all_samples = list()
-                for n in trange(opt2.n_iter, desc="Sampling"):
+                for n in trange(localOpt.n_iter, desc="Sampling"):
                     for prompts in tqdm(data, desc="data"):
                         uc = None
-                        if opt2.scale != 1.0:
+                        if localOpt.scale != 1.0:
                             uc = model.get_learned_conditioning(batch_size * [""])
                         if isinstance(prompts, tuple):
                             prompts = list(prompts)
@@ -487,13 +487,13 @@ def renderMod(data, postData):
                         # encode (scaled latent)
                         z_enc = samplerMod.stochastic_encode(init_latent, torch.tensor([t_enc]*batch_size).to(device))
                         # decode it
-                        samples = samplerMod.decode(z_enc, c, t_enc, unconditional_guidance_scale=opt2.scale,
+                        samples = samplerMod.decode(z_enc, c, t_enc, unconditional_guidance_scale=localOpt.scale,
                                                  unconditional_conditioning=uc,)
 
                         x_samples = model.decode_first_stage(samples)
                         x_samples = torch.clamp((x_samples + 1.0) / 2.0, min=0.0, max=1.0)
 
-                        if not opt2.skip_save:
+                        if not localOpt.skip_save:
                             for x_sample in x_samples:
                                 x_sample = 255. * rearrange(x_sample.cpu().numpy(), 'c h w -> h w c')
                                 # Image.fromarray(x_sample.astype(np.uint8)).save(
@@ -547,7 +547,9 @@ def image():
                 data = f.read().splitlines()
                 data = list(chunk(data, batch_size))
 
-        return renderImage(data)
+        localOpt = opt.copy()
+        localOpt.ddim_steps = request.args.get("n", default=localOpt.ddim_steps, type=int)
+        return renderImage(data, localOpt)
 
 @app.route("/mod", methods=["POST", "OPTIONS"])
 def reimage():
@@ -577,7 +579,10 @@ def reimage():
                 data = f.read().splitlines()
                 data = list(chunk(data, batch_size))
 
-        return renderMod(data, postData)
+        localOpt = opt.copy()
+        localOpt.ddim_steps = request.args.get("n", default=localOpt.ddim_steps, type=int)
+        localOpt.strength = request.args.get("noise", default=localOpt.strength, type=float)
+        return renderMod(data, postData, localOpt)
 
 # if __name__ == "__main__":
 #     main()
