@@ -554,6 +554,13 @@ def renderMod(data, postData):
 
 @app.route("/image")
 def image():
+    if request.method == "OPTIONS":
+        response = make_response("", 200)
+        response.headers["Access-Control-Allow-Origin"] = "*"
+        response.headers["Access-Control-Allow-Headers"] = "*"
+        response.headers["Access-Control-Allow-Methods"] = "*"
+        return response
+
     s = request.args.get("s")
     response = None
     if s is None or s == "":
@@ -575,6 +582,13 @@ def image():
 
 @app.route("/mod", methods=["POST"])
 def reimage():
+    if request.method == "OPTIONS":
+        response = make_response("", 200)
+        response.headers["Access-Control-Allow-Origin"] = "*"
+        response.headers["Access-Control-Allow-Headers"] = "*"
+        response.headers["Access-Control-Allow-Methods"] = "*"
+        return response
+
     s = request.args.get("s")
     response = None
     if s is None or s == "":
