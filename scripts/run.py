@@ -585,7 +585,7 @@ def reimage():
         else:
             postData = request.get_data()
             init_image = load_img(postData)
-        init_image = convert_img(image).to(device)
+        init_image = convert_img(init_image).to(device)
         init_image = repeat(init_image, '1 ... -> b ...', b=batch_size)
         return renderMod(data, init_image, localOpt)
 
