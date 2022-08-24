@@ -382,8 +382,8 @@ def load_img(postData):
     image = Image.open(io.BytesIO(postData)).convert('RGB')
     return image
 
-def create_img(w, h):
-    image = Image.new('RGB', (w, h))
+def create_img(w, h, color):
+    image = Image.new('RGB', (w, h), color)
     return image
 
 def convert_img(image):
@@ -550,6 +550,9 @@ def image():
         localOpt.ddim_steps = request.args.get("n", default=localOpt.ddim_steps, type=int)
         return renderImage(data, localOpt)
 
+def hex_color_string_to_tuple(hex_color):
+    return tuple(int(hex_color[i:i+2], 16) for i in (0, 2, 4))
+
 @app.route("/mod", methods=["GET", "POST", "OPTIONS"])
 def reimage():
     if request.method == "OPTIONS":
@@ -581,7 +584,13 @@ def reimage():
         localOpt.strength = request.args.get("noise", default=localOpt.strength, type=float)
         init_image = None
         if request.method == "GET":
-            init_image = create_img(512, 512)
+            color_hex = None
+            if request.args.get("color") is not None:
+                color_hex = request.args.get("color")
+            else:
+                color_hex = "FFFFFF"
+            color_tuple = hex_color_string_to_tuple(color_hex)
+            init_image = create_img(512, 512, color_tuple)
         else:
             postData = request.get_data()
             init_image = load_img(postData)
