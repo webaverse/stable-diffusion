@@ -379,7 +379,14 @@ if opt.fixed_code:
 #
 
 def load_img(postData):
-    image = Image.open(io.BytesIO(postData)).convert("RGB")
+    image = Image.open(io.BytesIO(postData)).convert('RGB')
+    return image
+
+def create_img(w, h):
+    image = Image.new('RGB', (w, h))
+    return image
+
+def convert_img(image):
     w, h = image.size
     print(f"loaded input image of size ({w}, {h})")
     w, h = map(lambda x: x - x % 32, (w, h))  # resize to integer multiple of 32
@@ -447,9 +454,7 @@ def renderImage(data, localOpt):
     response = make_response("no result", 500)
     return response
 
-def renderMod(data, postData, localOpt):
-    init_image = load_img(postData).to(device)
-    init_image = repeat(init_image, '1 ... -> b ...', b=batch_size)
+def renderMod(data, init_image, localOpt):
     init_latent = model.get_first_stage_encoding(model.encode_first_stage(init_image))  # move to latent space
 
     if localOpt.plms:
@@ -545,7 +550,7 @@ def image():
         localOpt.ddim_steps = request.args.get("n", default=localOpt.ddim_steps, type=int)
         return renderImage(data, localOpt)
 
-@app.route("/mod", methods=["POST", "OPTIONS"])
+@app.route("/mod", methods=["GET", "POST", "OPTIONS"])
 def reimage():
     if request.method == "OPTIONS":
         response = make_response("", 200)
@@ -559,8 +564,6 @@ def reimage():
     if s is None or s == "":
         response = make_response("no text provided", 400)
     else:
-        postData = request.get_data()
-
         data = None
         if not opt.from_file:
             prompt = s
@@ -576,7 +579,15 @@ def reimage():
         localOpt = Namespace(**vars(opt2))
         localOpt.ddim_steps = request.args.get("n", default=localOpt.ddim_steps, type=int)
         localOpt.strength = request.args.get("noise", default=localOpt.strength, type=float)
-        return renderMod(data, postData, localOpt)
+        init_image = None
+        if request.method == "GET":
+            init_image = create_img(512, 512)
+        else:
+            postData = request.get_data()
+            init_image = load_img(postData)
+        init_image = convert_img(image).to(device)
+        init_image = repeat(init_image, '1 ... -> b ...', b=batch_size)
+        return renderMod(data, init_image, localOpt)
 
 # if __name__ == "__main__":
 #     main()
