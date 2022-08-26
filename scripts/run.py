@@ -548,6 +548,8 @@ def image():
 
         localOpt = Namespace(**vars(opt))
         localOpt.ddim_steps = request.args.get("n", default=localOpt.ddim_steps, type=int)
+        localOpt.W = request.args.get("w", default=localOpt.W, type=int)
+        localOpt.H = request.args.get("h", default=localOpt.H, type=int)
         return renderImage(data, localOpt)
 
 def hex_color_string_to_tuple(hex_color):
@@ -582,6 +584,8 @@ def reimage():
         localOpt = Namespace(**vars(opt2))
         localOpt.ddim_steps = request.args.get("n", default=localOpt.ddim_steps, type=int)
         localOpt.strength = request.args.get("noise", default=localOpt.strength, type=float)
+        localOpt.W = request.args.get("w", default=localOpt.W, type=int)
+        localOpt.H = request.args.get("h", default=localOpt.H, type=int)
         init_image = None
         if request.method == "GET":
             color_hex = None
