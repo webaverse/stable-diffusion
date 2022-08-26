@@ -582,7 +582,7 @@ def reimage():
                 data = f.read().splitlines()
                 data = list(chunk(data, batch_size))
 
-        localOpt = copy.deepcopy(opt)
+        localOpt = copy.deepcopy(opt2)
         localOpt.ddim_steps = request.args.get("n", default=localOpt.ddim_steps, type=int)
         localOpt.strength = request.args.get("noise", default=localOpt.strength, type=float)
         localOpt.W = request.args.get("w", default=localOpt.W, type=int)
