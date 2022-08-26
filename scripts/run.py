@@ -588,8 +588,6 @@ def reimage():
         localOpt = makeOpt2()
         localOpt.ddim_steps = request.args.get("n", default=localOpt.ddim_steps, type=int)
         localOpt.strength = request.args.get("noise", default=localOpt.strength, type=float)
-        localOpt.W = request.args.get("w", default=localOpt.W, type=int)
-        localOpt.H = request.args.get("h", default=localOpt.H, type=int)
         init_image = None
         if request.method == "GET":
             color_hex = None
