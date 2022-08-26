@@ -202,7 +202,6 @@ opt = parser.parse_args([
     '1',
     '--skip_grid',
 ])
-opt = vars(opt);
 
 # img2img
 parser2 = argparse.ArgumentParser()
@@ -351,7 +350,6 @@ opt2 = parser2.parse_args([
     '1',
     '--skip_grid',
 ])
-opt2 = vars(opt2)
 
 #
 # initialize
