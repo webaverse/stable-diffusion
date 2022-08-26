@@ -19,7 +19,6 @@ from ldm.models.diffusion.ddim import DDIMSampler
 from ldm.models.diffusion.plms import PLMSSampler
 
 import io
-import copy
 from flask import Flask, request, send_file, make_response, abort
 
 app = Flask(__name__)
@@ -192,16 +191,18 @@ parser.add_argument(
     default="autocast"
 )
 
-opt = parser.parse_args([
-    '--prompt',
-    'anime girl',
-    '--plms',
-    '--ckpt',
-    'stable-diffusion-v-1-3/sd-v1-3-full-ema.ckpt',
-    '--n_samples',
-    '1',
-    '--skip_grid',
-])
+def makeOpt():
+    return parser.parse_args([
+        '--prompt',
+        'anime girl',
+        '--plms',
+        '--ckpt',
+        'stable-diffusion-v-1-3/sd-v1-3-full-ema.ckpt',
+        '--n_samples',
+        '1',
+        '--skip_grid',
+    ])
+opt = makeOpt()
 
 # img2img
 parser2 = argparse.ArgumentParser()
@@ -339,17 +340,19 @@ parser2.add_argument(
     default="autocast"
 )
 
-opt2 = parser2.parse_args([
-    '--prompt',
-    'anime girl',
-    "--strength",
-    "0.8",
-    '--ckpt',
-    'stable-diffusion-v-1-3/sd-v1-3-full-ema.ckpt',
-    '--n_samples',
-    '1',
-    '--skip_grid',
-])
+def makeOpt2():
+    return parser2.parse_args([
+        '--prompt',
+        'anime girl',
+        "--strength",
+        "0.8",
+        '--ckpt',
+        'stable-diffusion-v-1-3/sd-v1-3-full-ema.ckpt',
+        '--n_samples',
+        '1',
+        '--skip_grid',
+    ])
+opt2 = makeOpt2()
 
 #
 # initialize
@@ -547,7 +550,7 @@ def image():
                 data = f.read().splitlines()
                 data = list(chunk(data, batch_size))
 
-        localOpt = copy.deepcopy(opt)
+        localOpt = makeOpt()
         localOpt.ddim_steps = request.args.get("n", default=localOpt.ddim_steps, type=int)
         localOpt.W = request.args.get("w", default=localOpt.W, type=int)
         localOpt.H = request.args.get("h", default=localOpt.H, type=int)
@@ -582,7 +585,7 @@ def reimage():
                 data = f.read().splitlines()
                 data = list(chunk(data, batch_size))
 
-        localOpt = copy.deepcopy(opt2)
+        localOpt = makeOpt2()
         localOpt.ddim_steps = request.args.get("n", default=localOpt.ddim_steps, type=int)
         localOpt.strength = request.args.get("noise", default=localOpt.strength, type=float)
         localOpt.W = request.args.get("w", default=localOpt.W, type=int)
