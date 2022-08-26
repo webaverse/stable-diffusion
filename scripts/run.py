@@ -19,6 +19,7 @@ from ldm.models.diffusion.ddim import DDIMSampler
 from ldm.models.diffusion.plms import PLMSSampler
 
 import io
+import copy
 from flask import Flask, request, send_file, make_response, abort
 
 app = Flask(__name__)
@@ -546,7 +547,7 @@ def image():
                 data = f.read().splitlines()
                 data = list(chunk(data, batch_size))
 
-        localOpt = Namespace(**vars(opt))
+        localOpt = copy.deepcopy(opt)
         localOpt.ddim_steps = request.args.get("n", default=localOpt.ddim_steps, type=int)
         localOpt.W = request.args.get("w", default=localOpt.W, type=int)
         localOpt.H = request.args.get("h", default=localOpt.H, type=int)
@@ -581,7 +582,7 @@ def reimage():
                 data = f.read().splitlines()
                 data = list(chunk(data, batch_size))
 
-        localOpt = Namespace(**vars(opt2))
+        localOpt = copy.deepcopy(opt)
         localOpt.ddim_steps = request.args.get("n", default=localOpt.ddim_steps, type=int)
         localOpt.strength = request.args.get("noise", default=localOpt.strength, type=float)
         localOpt.W = request.args.get("w", default=localOpt.W, type=int)
