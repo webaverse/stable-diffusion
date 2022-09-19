@@ -69,6 +69,16 @@ parser.add_argument(
     help="the prompt to render"
 )
 parser.add_argument(
+    "--skip_safety",
+    action='store_true',
+    help="do not rickroll objectionable content",
+)
+parser.add_argument(
+    "--skip_watermark",
+    action='store_true',
+    help="do not watermark the image as machine-generated",
+)
+parser.add_argument(
     "--outdir",
     type=str,
     nargs="?",
@@ -201,6 +211,8 @@ def makeOpt():
         '--n_samples',
         '1',
         '--skip_grid',
+        '--skip_safety',
+        '--skip_watermark'
     ])
 opt = makeOpt()
 
@@ -213,6 +225,17 @@ parser2.add_argument(
     nargs="?",
     default="a painting of a virus monster playing guitar",
     help="the prompt to render"
+)
+
+parser2.add_argument(
+    "--skip_safety",
+    action='store_true',
+    help="do not rickroll objectionable content",
+)
+parser2.add_argument(
+    "--skip_watermark",
+    action='store_true',
+    help="do not watermark the image as machine-generated",
 )
 
 parser2.add_argument(
@@ -351,6 +374,8 @@ def makeOpt2():
         '--n_samples',
         '1',
         '--skip_grid',
+        '--skip_safety',
+        '--skip_watermark'
     ])
 opt2 = makeOpt2()
 
@@ -554,6 +579,8 @@ def image():
         localOpt.ddim_steps = request.args.get("n", default=localOpt.ddim_steps, type=int)
         localOpt.W = request.args.get("w", default=localOpt.W, type=int)
         localOpt.H = request.args.get("h", default=localOpt.H, type=int)
+        localOpt.skip_safety = request.args.get("skip_safety", default=localOpt.skip_safety, type=bool)
+        localOpt.skip_watermark = request.args.get("skip_watermark", default=localOpt.skip_watermark, type=bool)
         return renderImage(data, localOpt)
 
 def hex_color_string_to_tuple(hex_color):

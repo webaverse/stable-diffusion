@@ -300,22 +300,22 @@ def main():
     os.makedirs(opt.outdir, exist_ok=True)
     outpath = opt.outdir
 
-    if opt.skip_safety:
-        print("Safety filter disabled")
-    else:
-        # load safety model
-        safety_model_id = "CompVis/stable-diffusion-safety-checker"
-        print(f"Loading safety model {safety_model_id}")
-        safety_feature_extractor = None if opt.skip_safety else AutoFeatureExtractor.from_pretrained(safety_model_id)
-        safety_checker = None if opt.skip_safety else StableDiffusionSafetyChecker.from_pretrained(safety_model_id)
+    # if opt.skip_safety:
+    #     print("Safety filter disabled")
+    # else:
+    #     # load safety model
+    #     safety_model_id = "CompVis/stable-diffusion-safety-checker"
+    #     print(f"Loading safety model {safety_model_id}")
+    #     safety_feature_extractor = None if opt.skip_safety else AutoFeatureExtractor.from_pretrained(safety_model_id)
+    #     safety_checker = None if opt.skip_safety else StableDiffusionSafetyChecker.from_pretrained(safety_model_id)
 
-    if opt.skip_watermark:
-        print("Watermark disabled")
-    else:
-        print("Creating invisible watermark encoder (see https://github.com/ShieldMnt/invisible-watermark)...")
-        wm = "StableDiffusionV1"
-        wm_encoder = WatermarkEncoder()
-        wm_encoder.set_watermark('bytes', wm.encode('utf-8'))
+    # if opt.skip_watermark:
+    #     print("Watermark disabled")
+    # else:
+    #     print("Creating invisible watermark encoder (see https://github.com/ShieldMnt/invisible-watermark)...")
+    #     wm = "StableDiffusionV1"
+    #     wm_encoder = WatermarkEncoder()
+    #     wm_encoder.set_watermark('bytes', wm.encode('utf-8'))
 
     batch_size = opt.n_samples
     n_rows = opt.n_rows if opt.n_rows > 0 else batch_size
