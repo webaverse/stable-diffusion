@@ -6,10 +6,7 @@ import shlex
 import os
 import re
 import sys
-import copy
-import warnings
-import time
-import ldm.dream.readline
+from ldm.dream.model_leader import load_models
 from ldm.dream.pngwriter import PngWriter, PromptFormatter
 from ldm.dream.server import DreamServer, ThreadingDreamServer
 from ldm.dream.image_util import make_grid
@@ -22,61 +19,24 @@ output_cntr = 0
 
 
 def main():
+    load_models('./configs/models.json')
     """Initialize command-line parsers and the diffusion model"""
     arg_parser = create_argv_parser()
     opt = arg_parser.parse_args()
 
-    if opt.laion400m:
-        print('--laion400m flag has been deprecated. Please use --model laion400m instead.')
-        sys.exit(-1)
-    if opt.weights != 'model':
-        print('--weights argument has been deprecated. Please configure ./configs/models.yaml, and call it using --model instead.')
-        sys.exit(-1)
-
-    try:
-        models = OmegaConf.load(opt.config)
-        width = models[opt.model].width
-        height = models[opt.model].height
-        config = models[opt.model].config
-        weights = models[opt.model].weights
-    except (FileNotFoundError, IOError, KeyError) as e:
-        print(f'{e}. Aborting.')
-        sys.exit(-1)
-
     print('* Initializing, be patient...\n')
     sys.path.append('.')
     from pytorch_lightning import logging
-    from ldm.generate import Generate
 
-    # these two lines prevent a horrible warning message from appearing
-    # when the frozen CLIP tokenizer is imported
+ 
     import transformers
 
     transformers.logging.set_verbosity_error()
-
-    # creating a simple text2image object with a handful of
-    # defaults passed on the command line.
-    # additional parameters will be added (or overriden) during
-    # the user input loop
-    t2i = Generate(
-        width=width,
-        height=height,
-        sampler_name=opt.sampler_name,
-        weights=weights,
-        full_precision=opt.full_precision,
-        config=config,
-        grid=opt.grid,
-        # this is solely for recreating the prompt
-        seamless=opt.seamless,
-        embedding_path=opt.embedding_path,
-        device_type=opt.device,
-        ignore_ctrl_c=opt.infile is None,
-    )
-
     # make sure the output directory exists
     if not os.path.exists(opt.outdir):
         os.makedirs(opt.outdir)
 
+    print(opt.embedding_path)
     # gets rid of annoying messages about random seed
     logging.getLogger('pytorch_lightning').setLevel(logging.ERROR)
 
@@ -97,9 +57,6 @@ def main():
     if opt.seamless:
         print(">> changed to seamless tiling mode")
 
-    # preload the model
-    t2i.load_model()
-
     if not infile:
         print(
             "\n* Initialization done! Awaiting your command (-h for help, 'q' to quit)"
@@ -107,9 +64,9 @@ def main():
 
     cmd_parser = create_cmd_parser()
     if opt.web:
-        dream_server_loop(t2i, opt.host, opt.port, opt.outdir)
+        dream_server_loop(opt.host, opt.port, opt.outdir)
     else:
-        main_loop(t2i, opt.outdir, opt.prompt_as_dir, cmd_parser, infile)
+        main_loop(None, opt.outdir, opt.prompt_as_dir, cmd_parser, infile)
 
 
 def main_loop(t2i, outdir, prompt_as_dir, parser, infile):
@@ -341,7 +298,7 @@ def get_next_command(infile=None) -> str:  # command string
     return command
 
 
-def dream_server_loop(t2i, host, port, outdir):
+def dream_server_loop(host, port, outdir):
     print('\n* --web was specified, starting web server...')
     # Change working directory to the stable-diffusion directory
     os.chdir(
@@ -349,7 +306,6 @@ def dream_server_loop(t2i, host, port, outdir):
     )
 
     # Start server
-    DreamServer.model = t2i
     DreamServer.outdir = outdir
     dream_server = ThreadingDreamServer((host, port))
     print(">> Started Stable Diffusion dream server!")
@@ -505,7 +461,7 @@ def create_argv_parser():
     parser.add_argument(
         '--host',
         type=str,
-        default='127.0.0.1',
+        default='0.0.0.0',
         help='Web server: Host or IP to listen on. Set to 0.0.0.0 to accept traffic from other devices on your network.'
     )
     parser.add_argument(
