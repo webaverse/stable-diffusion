@@ -4,6 +4,7 @@ import json
 import shutil
 from urllib.parse import urlparse
 from ldm.dream.model_leader import get_model
+from ldm.db_logger import addQuery, getQueries
 import torch
 from PIL import Image
 import numpy as np
@@ -35,7 +36,6 @@ def build_opt(prompt):
     setattr(opt, 'progress_images', False)
     setattr(opt, 'seed', None)
     setattr(opt, 'variation_amount', 0)
-    setattr(opt, 'with_variations', [])
     setattr(opt, 'with_variations', None)
     return opt
 
@@ -59,7 +59,6 @@ def build_opt2(prompt, strength, steps):
     setattr(opt, 'progress_images', False)
     setattr(opt, 'seed', None)
     setattr(opt, 'variation_amount', 0)
-    setattr(opt, 'with_variations', [])
     setattr(opt, 'with_variations', None)
     return opt
 
@@ -87,6 +86,7 @@ def renderImage(self, data, _model):
     self.end_headers()
     
     def image_done(image, seed, upscaled=False):
+        addQuery('txt2img', image, data, None, opt.strength, opt.iterations, opt.steps, opt.width, opt.height, opt.seamless, opt.fit, opt.mask, opt.invert_mask, opt.cfg_scale, opt.sampler_name, opt.gfpgan_strength, opt.upscale, opt.progress_images, opt.seed, opt.variation_amount, opt.with_variations)
         img_byte_arr = io.BytesIO()
         image.save(img_byte_arr, format='PNG')
         self.wfile.write(img_byte_arr.getvalue())
@@ -108,6 +108,7 @@ def renderImageMass(self, data, _model, count):
     os.mkdir(folderName)
 
     def image_done(image, seed, currentCount, upscaled=False):
+        addQuery('txt2img', image, data, None, opt.strength, opt.iterations, opt.steps, opt.width, opt.height, opt.seamless, opt.fit, opt.mask, opt.invert_mask, opt.cfg_scale, opt.sampler_name, opt.gfpgan_strength, opt.upscale, opt.progress_images, opt.seed, opt.variation_amount, opt.with_variations)
         image.save(folderName + '/' + str(currentCount) + '.png', format='PNG')
         if (currentCount >= count):
             zipFileName = datetime.now().strftime("%Y%m%d%H%M%S") + 'images'
@@ -143,6 +144,7 @@ def renderModImage(self, init_image, data, strength, steps, _model):
     self.end_headers()
 
     def image_done(image, seed, upscaled=False):
+        addQuery('img2img', image, data, init_image, opt.strength, opt.iterations, opt.steps, opt.width, opt.height, opt.seamless, opt.fit, opt.mask, opt.invert_mask, opt.cfg_scale, opt.sampler_name, opt.gfpgan_strength, opt.upscale, opt.progress_images, opt.seed, opt.variation_amount, opt.with_variations)
         img_byte_arr = io.BytesIO()
         image.save(img_byte_arr, format='PNG')
         self.wfile.write(img_byte_arr.getvalue())
@@ -169,6 +171,7 @@ def renderModImageMass(self, init_image, data, strength, steps, _model, count):
     os.mkdir(folderName)
 
     def image_done(image, seed, currentCount, upscaled=False):
+        addQuery('txt2img', image, data, init_image, opt.strength, opt.iterations, opt.steps, opt.width, opt.height, opt.seamless, opt.fit, opt.mask, opt.invert_mask, opt.cfg_scale, opt.sampler_name, opt.gfpgan_strength, opt.upscale, opt.progress_images, opt.seed, opt.variation_amount, opt.with_variations)
         image.save(folderName + '/' + str(currentCount) + '.png', format='PNG')
         if (currentCount >= count):
             zipFileName = datetime.now().strftime("%Y%m%d%H%M%S") + 'images'
@@ -388,3 +391,24 @@ def do_post_mod_mass(self):
 
     model = get_model(id, embedding_path, self.address_string())
     renderModImageMass(self, post_data['init_image'], s, strength, steps, model, count)
+
+def do_get_db(self):
+    self.send_response(200)
+    self.send_header("Content-type", "text/html")
+    self.end_headers()
+    with open("./static/dream_web/db.html", "rb") as content:
+        self.wfile.write(content.read())
+
+def do_get_load_db(self):
+    query = urlparse(self.path).query
+    count = -1
+    if query is not None and query != "":
+        query_components = dict(qc.split("=") for qc in query.split("&"))
+        if "count" in query_components:
+            count = int(query_components["count"])
+
+    data = getQueries(count)
+    self.send_response(200)
+    self.send_header('Content-type', 'application/json')
+    self.end_headers()
+    self.wfile.write(bytes(json.dumps(data), 'utf-8'))

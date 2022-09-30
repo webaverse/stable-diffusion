@@ -1,0 +1,33 @@
+<html lang="en">
+  <head>
+    <title>Stable Diffusion Database Viewer</title>
+    <meta charset="utf-8">
+    <link rel="icon" type="image/x-icon" href="static/dream_web/favicon.ico" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="static/dream_web/index.css">
+    <script src="config.js"></script>
+    <script src="static/dream_web/db.js"></script>
+  </head>
+  <body>
+    <header>
+      <h1>Stable Diffusion Database Viewer</h1>
+    </header>
+
+    <main>
+      <form id="generate-form" method="post" action="#">
+	      <fieldset id="txt2img">
+          <div id="search-box">
+            <input value="1" type="number" id="prompt" name="prompt" size="4">
+            <input type="submit" id="submit" value="Load">
+	        </div>
+        </fieldset>
+      </section>
+
+      <div id="results">
+        <div id="no-results-message">
+          <i><p>No results...</p></i>
+        </div>
+      </div>
+    </main>
+  </body>
+</html>

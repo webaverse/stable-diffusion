@@ -11,6 +11,7 @@ from ldm.dream.pngwriter import PngWriter, PromptFormatter
 from ldm.dream.server import DreamServer, ThreadingDreamServer
 from ldm.dream.image_util import make_grid
 from omegaconf import OmegaConf
+from ldm.db_logger import initDbConnection
 
 # Placeholder to be replaced with proper class that tracks the
 # outputs and associates with the prompt that generated them.
@@ -19,6 +20,7 @@ output_cntr = 0
 
 
 def main():
+    initDbConnection()
     load_models('./configs/models.json')
     """Initialize command-line parsers and the diffusion model"""
     arg_parser = create_argv_parser()

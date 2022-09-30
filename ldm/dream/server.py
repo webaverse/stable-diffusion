@@ -8,8 +8,9 @@ from urllib import request
 from ldm.dream.model_leader import get_model
 from ldm.dream.pngwriter import PngWriter, PromptFormatter
 from threading import Event
-from ldm.dream.text2img_server import do_get, do_get_image_mass, do_get_mod, do_get_mod_image_mass, do_post_mod, do_post_mod_mass
-    
+from ldm.dream.text2img_server import do_get, do_get_db, do_get_image_mass, do_get_load_db, do_get_mod, do_get_mod_image_mass, do_post_mod, do_post_mod_mass
+from ldm.db_logger import addQuery
+
 def build_opt(post_data, seed, gfpgan_model_exists):
     opt = argparse.Namespace()
     setattr(opt, 'prompt', post_data['prompt'])
@@ -112,6 +113,10 @@ class DreamServer(BaseHTTPRequestHandler):
             do_get_mod_image_mass(self)
         elif self.path.startswith("/mod"):
             do_get_mod(self)
+        elif self.path.startswith("/db"):
+            do_get_db(self)
+        elif self.path.startswith("/load_db"):
+            do_get_load_db(self)
         else:
             path = "." + self.path
             cwd = os.path.realpath(os.getcwd())
@@ -169,6 +174,7 @@ class DreamServer(BaseHTTPRequestHandler):
             # is complete. The upscaling replaces the original file, so the second
             # entry should not be inserted into the image list.
             def image_done(image, seed, upscaled=False):
+                addQuery('ui_generation', image, opt.prompt, opt.init_img, opt.strength, opt.iterations, opt.steps, opt.width, opt.height, opt.seamless, opt.fit, opt.mask, opt.invert_mask, opt.cfg_scale, opt.sampler_name, opt.gfpgan_strength, opt.upscale, opt.progress_images, opt.seed, opt.variation_amount, opt.with_variations)
                 name = f'{prefix}.{seed}.png'
                 iter_opt = argparse.Namespace(**vars(opt)) # copy
                 if opt.variation_amount > 0:
