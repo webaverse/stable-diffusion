@@ -102,4 +102,7 @@ sudo apt install authbind
 # Configure access to port 80
 sudo touch /etc/authbind/byport/80
 sudo chmod 777 /etc/authbind/byport/80
+
+and start the server using:
+(ldm) ~/stable-diffusion$ authbind python3 scripts/dream.py --web
 ```
