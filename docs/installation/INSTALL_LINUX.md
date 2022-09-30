@@ -1,108 +1,201 @@
-# **Linux Installation**
+<h1 align='center'><b>InvokeAI: A Stable Diffusion Toolkit</b></h1>
 
-1. You will need to install the following prerequisites if they are not already available. Use your operating system's preferred installer
+<p align='center'>
+<img src="docs/assets/logo.png"/>
+</p>
 
-- Python (version 3.8.5 recommended; higher may work)
-- git
+<p align="center">
+    <img src="https://img.shields.io/github/last-commit/invoke-ai/InvokeAI?logo=Python&logoColor=green&style=for-the-badge" alt="last-commit"/>
+    <img src="https://img.shields.io/github/stars/invoke-ai/InvokeAI?logo=GitHub&style=for-the-badge" alt="stars"/>
+    <br>
+    <img src="https://img.shields.io/github/issues/invoke-ai/InvokeAI?logo=GitHub&style=for-the-badge" alt="issues"/>
+    <img src="https://img.shields.io/github/issues-pr/invoke-ai/InvokeAI?logo=GitHub&style=for-the-badge" alt="pull-requests"/>
+</p>
 
-2. Install the Python Anaconda environment manager.
+This is a fork of
+[CompVis/stable-diffusion](https://github.com/CompVis/stable-diffusion),
+the open source text-to-image generator. It provides a streamlined
+process with various new features and options to aid the image
+generation process. It runs on Windows, Mac and Linux machines,
+and runs on GPU cards with as little as 4 GB or RAM.
 
-```
-~$  wget https://repo.anaconda.com/archive/Anaconda3-2022.05-Linux-x86_64.sh
-~$  chmod +x Anaconda3-2022.05-Linux-x86_64.sh
-~$  ./Anaconda3-2022.05-Linux-x86_64.sh
-```
+_Note: This fork is rapidly evolving. Please use the
+[Issues](https://github.com/invoke-ai/InvokeAI/issues) tab to
+report bugs and make feature requests. Be sure to use the provided
+templates. They will help aid diagnose issues faster._
 
-After installing anaconda, you should log out of your system and log back in. If the installation
-worked, your command prompt will be prefixed by the name of the current anaconda environment - `(base)`.
+_This repository was formally known as /stable-diffusion_
 
-3. Copy the stable-diffusion source code from GitHub:
+# **Table of Contents**
 
-```
-(base) ~$ git clone https://github.com/webaverse-studios/stable-diffusion
-```
+1. [Installation](#installation)
+2. [Major Features](#features)
+3. [Changelog](#latest-changes)
+4. [Troubleshooting](#troubleshooting)
+5. [Contributing](#contributing)
+6. [Support](#support)
 
-This will create stable-diffusion folder where you will follow the rest of the steps.
+# Installation
 
-4. Enter the newly-created stable-diffusion folder. From this step forward make sure that you are working in the stable-diffusion directory!
+This fork is supported across multiple platforms. You can find individual installation instructions below.
 
-```
-(base) ~$ cd stable-diffusion
-(base) ~/stable-diffusion$
-```
+- ## [Linux](docs/installation/INSTALL_LINUX.md)
+- ## [Windows](docs/installation/INSTALL_WINDOWS.md)
+- ## [Macintosh](docs/installation/INSTALL_MAC.md)
 
-5. Use anaconda to copy necessary python packages, create a new python environment named `ldm` and activate the environment.
+## **Hardware Requirements**
 
-```
-(base) ~/stable-diffusion$ conda env create -f environment.yaml
-(base) ~/stable-diffusion$ conda activate ldm
-(ldm) ~/stable-diffusion$
-```
+**System**
 
-After these steps, your command prompt will be prefixed by `(ldm)` as shown above.
+You wil need one of the following:
 
-6. Load a couple of small machine-learning models required by stable diffusion:
+- An NVIDIA-based graphics card with 4 GB or more VRAM memory.
+- An Apple computer with an M1 chip.
 
-```
-(ldm) ~/stable-diffusion$ python3 scripts/preload_models.py
-```
+**Memory**
 
-Note that this step is necessary because I modified the original just-in-time model loading scheme to allow the script to work on GPU machines that are not internet connected. See [Preload Models](../features/OTHER.md#preload-models)
+- At least 12 GB Main Memory RAM.
 
-7. Now you need to install the weights for the stable diffusion model.
+**Disk**
 
-- For running with the released weights, you will first need to set up an acount with Hugging Face (https://huggingface.co).
-- Use your credentials to log in, and then point your browser at https://huggingface.co/CompVis/stable-diffusion-v-1-4-original.
-- You may be asked to sign a license agreement at this point.
-- Click on "Files and versions" near the top of the page, and then click on the file named "sd-v1-4.ckpt". You'll be taken to a page that prompts you to click the "download" link. Save the file somewhere safe on your local machine.
+- At least 6 GB of free disk space for the machine learning model, Python, and all its dependencies.
 
-Now run the following commands from within the stable-diffusion directory. This will create a symbolic link from the stable-diffusion model.ckpt file, to the true location of the sd-v1-4.ckpt file.
+**Note**
 
-```
-(ldm) ~/stable-diffusion$ mkdir -p models/ldm/stable-diffusion-v1
-(ldm) ~/stable-diffusion$ ln -sf /path/to/sd-v1-4.ckpt models/ldm/stable-diffusion-v1/model.ckpt
-```
+If you are have a Nvidia 10xx series card (e.g. the 1080ti), please
+run the dream script in full-precision mode as shown below.
 
-8. Start generating images!
+Similarly, specify full-precision mode on Apple M1 hardware.
 
-```
-# to start the webui
-(ldm) ~/stable-diffusion$ python3 scripts/dream.py --web
-
-# for the pre-release weights use the -l or --liaon400m switch
-(ldm) ~/stable-diffusion$ python3 scripts/dream.py -l
-
-# for the post-release weights do not use the switch
-(ldm) ~/stable-diffusion$ python3 scripts/dream.py
-
-# for additional configuration switches and arguments, use -h or --help
-(ldm) ~/stable-diffusion$ python3 scripts/dream.py -h
-```
-
-9. Subsequently, to relaunch the script, be sure to run "conda activate ldm" (step 5, second command), enter the `stable-diffusion` directory, and then launch the dream script (step 8). If you forget to activate the ldm environment, the script will fail with multiple `ModuleNotFound` errors.
-
-### Updating to newer versions of the script
-
-This distribution is changing rapidly. If you used the `git clone` method (step 5) to download the stable-diffusion directory, then to update to the latest and greatest version, launch the Anaconda window, enter `stable-diffusion` and type:
+To run in full-precision mode, start `dream.py` with the
+`--full_precision` flag:
 
 ```
-(ldm) ~/stable-diffusion$ git pull
+(ldm) ~/stable-diffusion$ python scripts/dream.py --full_precision
 ```
 
-This will bring your local copy into sync with the remote one.
+# Features
 
-### Troubleshooting
- 
-```
-# PermissionError: [Errno 1] Operation not permitted
-On Ubuntu, the port 80 needs Sudo to be used, but sudo isn't advised to be used in python, authbind is an option
+## **Major Features**
 
-sudo apt install authbind
+- ## [Interactive Command Line Interface](docs/features/CLI.md)
 
-# Configure access to port 80
-sudo touch /etc/authbind/byport/80
-sudo chmod 777 /etc/authbind/byport/80
+- ## [Image To Image](docs/features/IMG2IMG.md)
 
-and start the server using:
-(ldm) ~/stable-diffusion$ authbind python3 scripts/dream.py --web
-```
+- ## [Inpainting Support](docs/features/INPAINTING.md)
+
+- ## [GFPGAN and Real-ESRGAN Support](docs/features/UPSCALE.md)
+
+- ## [Seamless Tiling](docs/features/OTHER.md#seamless-tiling)
+
+- ## [Google Colab](docs/features/OTHER.md#google-colab)
+
+- ## [Web Server](docs/features/WEB.md)
+
+- ## [Reading Prompts From File](docs/features/OTHER.md#reading-prompts-from-a-file)
+
+- ## [Shortcut: Reusing Seeds](docs/features/OTHER.md#shortcuts-reusing-seeds)
+
+- ## [Weighted Prompts](docs/features/OTHER.md#weighted-prompts)
+
+- ## [Variations](docs/features/VARIATIONS.md)
+
+- ## [Personalizing Text-to-Image Generation](docs/features/TEXTUAL_INVERSION.md)
+
+- ## [Simplified API for text to image generation](docs/features/OTHER.md#simplified-api)
+
+## **Other Features**
+
+- ### [Creating Transparent Regions for Inpainting](docs/features/INPAINTING.md#creating-transparent-regions-for-inpainting)
+
+- ### [Preload Models](docs/features/OTHER.md#preload-models)
+
+# Latest Changes
+
+- v1.14 (11 September 2022)
+
+  - Memory optimizations for small-RAM cards. 512x512 now possible on 4 GB GPUs.
+  - Full support for Apple hardware with M1 or M2 chips.
+  - Add "seamless mode" for circular tiling of image. Generates beautiful effects. ([prixt](https://github.com/prixt)).
+  - Inpainting support.
+  - Improved web server GUI.
+  - Lots of code and documentation cleanups.
+
+- v1.13 (3 September 2022
+
+  - Support image variations (see [VARIATIONS](docs/features/VARIATIONS.md) ([Kevin Gibbons](https://github.com/bakkot) and many contributors and reviewers)
+  - Supports a Google Colab notebook for a standalone server running on Google hardware [Arturo Mendivil](https://github.com/artmen1516)
+  - WebUI supports GFPGAN/ESRGAN facial reconstruction and upscaling [Kevin Gibbons](https://github.com/bakkot)
+  - WebUI supports incremental display of in-progress images during generation [Kevin Gibbons](https://github.com/bakkot)
+  - A new configuration file scheme that allows new models (including upcoming stable-diffusion-v1.5)
+    to be added without altering the code. ([David Wager](https://github.com/maddavid12))
+  - Can specify --grid on dream.py command line as the default.
+  - Miscellaneous internal bug and stability fixes.
+  - Works on M1 Apple hardware.
+  - Multiple bug fixes.
+
+For older changelogs, please visit **[CHANGELOGS](docs/CHANGELOG.md)**.
+
+# Troubleshooting
+
+Please check out our **[Q&A](docs/help/TROUBLESHOOT.md)** to get solutions for common installation problems and other issues.
+
+# Contributing
+
+Anyone who wishes to contribute to this project, whether documentation, features, bug fixes, code cleanup, testing, or code reviews, is very much encouraged to do so. If you are unfamiliar with
+how to contribute to GitHub projects, here is a [Getting Started Guide](https://opensource.com/article/19/7/create-pull-request-github).
+
+A full set of contribution guidelines, along with templates, are in progress, but for now the most important thing is to **make your pull request against the "development" branch**, and not against "main". This will help keep public breakage to a minimum and will allow you to propose more radical changes.
+
+## **Contributors**
+
+This fork is a combined effort of various people from across the world. [Check out the list of all these amazing people](docs/CONTRIBUTORS.md). We thank them for their time, hard work and effort.
+
+# Support
+
+For support,
+please use this repository's GitHub Issues tracking service. Feel free
+to send me an email if you use and like the script.
+
+Original portions of the software are Copyright (c) 2020 Lincoln D. Stein (https://github.com/lstein)
+
+# Further Reading
+
+Please see the original README for more information on this software
+and underlying algorithm, located in the file [README-CompViz.md](docs/README-CompViz.md).
+
+# How to use the --web
+
+The --web opens a webserver, that has a main ui, a database viewer and some headless routes
+The main ui has options to generate images and shows the results.! (/)
+![Screenshot_45](https://user-images.githubusercontent.com/45359358/193286613-519981a4-06e6-439d-bbfd-bf6d77c560ad.png)
+
+The database viewer, can fetch old generations and their parameters and result (/db)
+![Screenshot_42](https://user-images.githubusercontent.com/45359358/193286836-60ec6461-626b-4214-b1f6-88b07edecb65.png)
+
+There are () other routes:
+ * /image (get) 
+   * arguments: s (prompt), id (model id, can be left out to use default model) 
+   * generates an image
+   * example: 127.0.0.1/image?s=cat&id=sd_v1.4
+ * /image_mass (get) 
+   * arguments: s (prompt), id (model id, can be left out to use default model), count (how many images to generate)
+   * generates multiple images and returns a zip file
+   * example: 127.0.0.1/image_mass?s=cat&id=sd_v1.4&count=4
+ * /mod (get) 
+   * arguments: s (prompt), id (model id, can be left out to use default model), color (the hex id for the colour to use, can be left to use white colour as default)
+   * image to image generation
+   * example: 127.0.0.1/mod?s=cat&id=sd_v1.4&color=03fce3
+ * /mod_mass (get)
+   * arguments: s (prompt), id (model id, can be left out to use default model), color (the hex id for the colour to use, can be left to use white colour as default), count (how many images to generate)
+   * generates multiple image 2 image and returns a zip
+   * example: 127.0.0.1/mod_mass?s=cat&id=sd_v1.4&color=03fce3&count=4
+ * /mod (set)
+   * arguments: s (prompt), id (model id, can be left out to use default model)
+   * is used for image to image, it needs an image as the body request
+ * /mod_mass(set)
+   * arguments: s (prompt), id (model id, can be left out to use default model), count (how many generations it will do)
+   * is used for image to image, it needs an image as the body request and returns a zip with all the generated images
+ * /load_db (get)
+   * arguments: count (can be left out, to get all data)
+   * returns old generations (results & parameters)
