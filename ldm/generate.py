@@ -669,6 +669,9 @@ class Generate:
 
     def load_textual_inversion_embeddings(self):
         dirname = 'embeddings/'
+        if not os.path.exists(dirname):
+            os.mkdir(dirname)
+        
         mt = os.path.getmtime(dirname)
         if self.dir_mtime is not None and mt <= self.dir_mtime:
             return
