@@ -155,7 +155,7 @@ async function generateSubmit(form) {
 }
 
 async function fetchRunLog() {
-    try {
+   /* try {
         let response = await fetch('/run_log.json')
         const data = await response.json();
         for(let item of data.run_log) {
@@ -163,7 +163,7 @@ async function fetchRunLog() {
         }
     } catch (e) {
         console.error(e);
-    }
+    }*/
 }
 
 window.onload = async () => {
