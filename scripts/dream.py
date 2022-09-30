@@ -469,7 +469,7 @@ def create_argv_parser():
     parser.add_argument(
         '--port',
         type=int,
-        default='9090',
+        default='80',
         help='Web server: Port to listen on'
     )
     parser.add_argument(
