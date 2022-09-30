@@ -8,7 +8,7 @@ from urllib import request
 from ldm.dream.model_leader import get_model
 from ldm.dream.pngwriter import PngWriter, PromptFormatter
 from threading import Event
-from ldm.dream.text2img_server import do_get, do_get_mod, do_post_mod
+from ldm.dream.text2img_server import do_get, do_get_image_mass, do_get_mod, do_get_mod_image_mass, do_post_mod, do_post_mod_mass
     
 def build_opt(post_data, seed, gfpgan_model_exists):
     opt = argparse.Namespace()
@@ -104,8 +104,12 @@ class DreamServer(BaseHTTPRequestHandler):
             self.send_header("Content-type", "application/json")
             self.end_headers()
             self.wfile.write(bytes('{}', 'utf8'))
+        elif self.path.startswith("/image_mass"):
+            do_get_image_mass(self)
         elif self.path.startswith("/image"):
            do_get(self)
+        elif self.path.startswith("/mod_mass"):
+            do_get_mod_image_mass(self)
         elif self.path.startswith("/mod"):
             do_get_mod(self)
         else:
@@ -126,7 +130,9 @@ class DreamServer(BaseHTTPRequestHandler):
                 self.send_response(404)
 
     def do_POST(self):
-        if self.path.startswith("/mod"):
+        if self.path.startswith("/mod_mass"):
+            do_post_mod_mass(self)
+        elif self.path.startswith("/mod"):
             do_post_mod(self)
         else:
             self.send_response(200)

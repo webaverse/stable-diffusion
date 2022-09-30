@@ -74,6 +74,45 @@ class Generator():
                 seed = self.new_seed()
         return results
     
+    def generateWithCount(self,prompt,init_image,width,height,iterations=1,seed=None,
+                 image_callback=None, step_callback=None, currentCount=1,
+                 **kwargs):
+        device_type,scope   = choose_autocast_device(self.model.device)
+        make_image          = self.get_make_image(
+            prompt,
+            init_image    = init_image,
+            width         = width,
+            height        = height,
+            step_callback = step_callback,
+            **kwargs
+        )
+
+        results             = []
+        seed                = seed if seed else self.new_seed()
+        seed, initial_noise = self.generate_initial_noise(seed, width, height)
+        with scope(device_type), self.model.ema_scope():
+            for n in trange(iterations, desc='Generating'):
+                x_T = None
+                if self.variation_amount > 0:
+                    seed_everything(seed)
+                    target_noise = self.get_noise(width,height)
+                    x_T = self.slerp(self.variation_amount, initial_noise, target_noise)
+                elif initial_noise is not None:
+                    # i.e. we specified particular variations
+                    x_T = initial_noise
+                else:
+                    seed_everything(seed)
+                    if self.model.device.type == 'mps':
+                        x_T = self.get_noise(width,height)
+
+                # make_image will do the equivalent of get_noise itself
+                image = make_image(x_T)
+                results.append([image, seed])
+                if image_callback is not None:
+                    image_callback(image, seed, currentCount)
+                seed = self.new_seed()
+        return results
+    
     def sample_to_image(self,samples):
         """
         Returns a function returning an image derived from the prompt and the initial image

@@ -1,5 +1,7 @@
 import argparse
+from datetime import datetime
 import json
+import shutil
 from urllib.parse import urlparse
 from ldm.dream.model_leader import get_model
 import torch
@@ -11,6 +13,7 @@ import os
 
 device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
 batch_size = 3
+default_model = "stable-diffusion-1.4"
 
 def build_opt(prompt):
     opt = argparse.Namespace()
@@ -94,7 +97,44 @@ def renderImage(self, data, _model):
     opt = build_opt(data)
     _model.prompt2image(**vars(opt), step_callback=image_progress, image_callback=image_done)
 
-default_model = "stable-diffusion-1.4"
+
+def renderImageMass(self, data, _model, count):
+    self.send_response(200)
+    self.send_header("Access-Control-Allow-Origin", "*")
+    self.send_header('Content-type', 'application/zip')
+    self.end_headers()
+
+    folderName = datetime.now().strftime("%Y%m%d%H%M%S") + "_temp"
+    os.mkdir(folderName)
+
+    def image_done(image, seed, currentCount, upscaled=False):
+        image.save(folderName + '/' + str(currentCount) + '.png', format='PNG')
+        if (currentCount >= count):
+            zipFileName = datetime.now().strftime("%Y%m%d%H%M%S") + 'images'
+            shutil.make_archive(zipFileName, 'zip', folderName)
+            for root, dirs, files in os.walk(folderName, topdown=False):
+                for name in files:
+                    os.remove(os.path.join(root, name))
+                for name in dirs:
+                    os.rmdir(os.path.join(root, name))
+            os.rmdir(folderName)
+            data = []
+            with open(zipFileName + '.zip', 'rb') as f:
+                data = io.BytesIO(f.read())
+            
+            os.remove(zipFileName + '.zip')
+            self.wfile.write(data.read())
+            return
+
+        _model.prompt2imageWithCount(**vars(opt), step_callback=image_progress, image_callback=image_done, currentCount=currentCount)
+
+    
+    def image_progress(sample, step):
+        pass
+
+    opt = build_opt(data)
+    _model.prompt2imageWithCount(**vars(opt), step_callback=image_progress, image_callback=image_done, currentCount=0)
+
 
 def renderModImage(self, init_image, data, strength, steps, _model):  
     self.send_response(200)
@@ -116,6 +156,47 @@ def renderModImage(self, init_image, data, strength, steps, _model):
         opt = build_opt2(data, strength, steps)
         opt.init_img = "./img2img-tmp.png"
         _model.prompt2image(**vars(opt), step_callback=image_progress, image_callback=image_done)
+    finally:
+        os.remove("./img2img-tmp.png")
+
+def renderModImageMass(self, init_image, data, strength, steps, _model, count):
+    self.send_response(200)
+    self.send_header("Access-Control-Allow-Origin", "*")
+    self.send_header('Content-type', 'application/zip')
+    self.end_headers()
+
+    folderName = datetime.now().strftime("%Y%m%d%H%M%S") + "_temp"
+    os.mkdir(folderName)
+
+    def image_done(image, seed, currentCount, upscaled=False):
+        image.save(folderName + '/' + str(currentCount) + '.png', format='PNG')
+        if (currentCount >= count):
+            zipFileName = datetime.now().strftime("%Y%m%d%H%M%S") + 'images'
+            shutil.make_archive(zipFileName, 'zip', folderName)
+            for root, dirs, files in os.walk(folderName, topdown=False):
+                for name in files:
+                    os.remove(os.path.join(root, name))
+                for name in dirs:
+                    os.rmdir(os.path.join(root, name))
+            os.rmdir(folderName)
+            data = []
+            with open(zipFileName + '.zip', 'rb') as f:
+                data = io.BytesIO(f.read())
+            
+            os.remove(zipFileName + '.zip')
+            self.wfile.write(data.read())
+            return
+
+        _model.prompt2imageWithCount(**vars(opt), step_callback=image_progress, image_callback=image_done, currentCount=currentCount)
+    
+    def image_progress(sample, step):
+        pass
+
+    try:
+        init_image.save("./img2img-tmp.png")
+        opt = build_opt2(data, strength, steps)
+        opt.init_img = "./img2img-tmp.png"
+        _model.prompt2imageWithCount(**vars(opt), step_callback=image_progress, image_callback=image_done, currentCount=0)
     finally:
         os.remove("./img2img-tmp.png")
 
@@ -141,8 +222,33 @@ def do_get(self):
     renderImage(self, prompt, model)
     return
 
+def do_get_image_mass(self):
+    query = urlparse(self.path).query
+    query_components = dict(qc.split("=") for qc in query.split("&"))
+    s = query_components["s"]
+    id = default_model
+    if "id" in query_components:
+        id = query_components["id"]
+
+    embedding_path = None
+    if "embedding_path" in query_components:
+        embedding_path = query_components["embedding_path"]
+
+    if s is None or s == "":
+        self.send_response(404)
+        self.end_headers()
+        return
+    
+    count = 1
+    if 'count' in query_components:
+        count = int(query_components['count'])
+
+    prompt = s
+    model = get_model(id, embedding_path, self.address_string())
+    renderImageMass(self, prompt, model, count)
+    return
+
 def do_get_mod(self):
-    print('do_get_mode')
     query = urlparse(self.path).query
     query_components = dict(qc.split("=") for qc in query.split("&"))
     s = query_components["s"]
@@ -177,6 +283,46 @@ def do_get_mod(self):
     renderModImage(self, init_image, s, strength, steps, model)
     return
 
+def do_get_mod_image_mass(self):
+    query = urlparse(self.path).query
+    query_components = dict(qc.split("=") for qc in query.split("&"))
+    s = query_components["s"]
+    id = default_model
+    if "id" in query_components:
+        id = query_components["id"]
+
+    embedding_path = None
+    if "embedding_path" in query_components:
+        embedding_path = query_components["embedding_path"]
+
+    if s is None or s == "":
+        self.send_response(404)
+        self.end_headers()
+        return
+    
+    color = 'FFFFFF'
+    if "color" in query_components:
+        color = query_components["color"]
+    
+    strength = 0.75
+    if "strength" in query_components:
+        strength = float(query_components["strength"])
+
+    steps = 50
+    if "steps" in query_components:
+        steps = int(query_components["steps"])
+    
+    count = 1
+    if 'count' in query_components:
+        count = int(query_components['count'])
+    
+    color_tuple = hex_color_string_to_tuple(color)
+    init_image = create_img(512, 512, color_tuple)
+    model = get_model(id, embedding_path, self.address_string())
+    renderModImageMass(self, init_image, s, strength, steps, model, count)
+    return
+
+
 def do_post_mod(self):
     query = urlparse(self.path).query
     query_components = dict(qc.split("=") for qc in query.split("&"))
@@ -207,3 +353,38 @@ def do_post_mod(self):
 
     model = get_model(id, embedding_path, self.address_string())
     renderModImage(self, post_data['init_image'], s, strength, steps, model)
+
+def do_post_mod_mass(self):
+    query = urlparse(self.path).query
+    query_components = dict(qc.split("=") for qc in query.split("&"))
+    s = query_components["s"]
+    id = default_model
+    if "id" in query_components:
+        id = query_components["id"]
+
+    embedding_path = None
+    if "embedding_path" in query_components:
+        embedding_path = query_components["embedding_path"]
+
+    if s is None or s == "":
+        self.send_response(404)
+        self.end_headers()
+        return
+    
+    strength = 0.75
+    if "strength" in query_components:
+        strength = float(query_components["strength"])
+
+    steps = 50
+    if "steps" in query_components:
+        steps = int(query_components["steps"])
+    
+    count = 1
+    if 'count' in query_components:
+        count = int(query_components['count'])
+        
+    content_length = int(self.headers['Content-Length'])
+    post_data = json.loads(self.rfile.read(content_length))
+
+    model = get_model(id, embedding_path, self.address_string())
+    renderModImageMass(self, post_data['init_image'], s, strength, steps, model, count)

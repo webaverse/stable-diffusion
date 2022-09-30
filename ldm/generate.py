@@ -374,6 +374,245 @@ class Generate:
             )
         return results
 
+    def upscale_and_reconstructWithCount(self,
+                                image_list,
+                                upscale       = None,
+                                strength      =  0.0,
+                                save_original = False,
+                                image_callback = None,
+                                currentCount   = 1):
+        try:
+            if upscale is not None:
+                from ldm.gfpgan.gfpgan_tools import real_esrgan_upscale
+            if strength > 0:
+                from ldm.gfpgan.gfpgan_tools import run_gfpgan
+        except (ModuleNotFoundError, ImportError):
+            print(traceback.format_exc(), file=sys.stderr)
+            print('>> You may need to install the ESRGAN and/or GFPGAN modules')
+            return
+            
+        for r in image_list:
+            image, seed = r
+            try:
+                if upscale is not None:
+                    if len(upscale) < 2:
+                        upscale.append(0.75)
+                    image = real_esrgan_upscale(
+                        image,
+                        upscale[1],
+                        int(upscale[0]),
+                        seed,
+                    )
+                if strength > 0:
+                    image = run_gfpgan(
+                        image, strength, seed, 1
+                    )
+            except Exception as e:
+                print(
+                    f'>> Error running RealESRGAN or GFPGAN. Your image was not upscaled.\n{e}'
+                )
+
+            if image_callback is not None:
+                image_callback(image, seed, currentCount, upscaled=True)
+            else:
+                r[0] = image
+
+    def prompt2imageWithCount(
+            self,
+            # these are common
+            prompt,
+            iterations     =    None,
+            steps          =    None,
+            seed           =    None,
+            cfg_scale      =    None,
+            ddim_eta       =    None,
+            skip_normalize =    False,
+            image_callback =    None,
+            step_callback  =    None,
+            width          =    None,
+            height         =    None,
+            sampler_name   =    None,
+            seamless       =    False,
+            log_tokenization=  False,
+            with_variations =   None,
+            variation_amount =  0.0,
+            # these are specific to img2img and inpaint
+            init_img       =    None,
+            init_mask      =    None,
+            fit            =    False,
+            strength       =    None,
+            # these are specific to GFPGAN/ESRGAN
+            gfpgan_strength=    0,
+            save_original  =    False,
+            upscale        =    None,
+            currentCount   =    1,
+            **args,
+    ):   # eat up additional cruft
+        """
+        ldm.generate.prompt2image() is the common entry point for txt2img() and img2img()
+        It takes the following arguments:
+           prompt                          // prompt string (no default)
+           iterations                      // iterations (1); image count=iterations
+           steps                           // refinement steps per iteration
+           seed                            // seed for random number generator
+           width                           // width of image, in multiples of 64 (512)
+           height                          // height of image, in multiples of 64 (512)
+           cfg_scale                       // how strongly the prompt influences the image (7.5) (must be >1)
+           seamless                        // whether the generated image should tile
+           init_img                        // path to an initial image
+           strength                        // strength for noising/unnoising init_img. 0.0 preserves image exactly, 1.0 replaces it completely
+           gfpgan_strength                 // strength for GFPGAN. 0.0 preserves image exactly, 1.0 replaces it completely
+           ddim_eta                        // image randomness (eta=0.0 means the same seed always produces the same image)
+           step_callback                   // a function or method that will be called each step
+           image_callback                  // a function or method that will be called each time an image is generated
+           with_variations                 // a weighted list [(seed_1, weight_1), (seed_2, weight_2), ...] of variations which should be applied before doing any generation
+           variation_amount                // optional 0-1 value to slerp from -S noise to random noise (allows variations on an image)
+
+        To use the step callback, define a function that receives two arguments:
+        - Image GPU data
+        - The step number
+
+        To use the image callback, define a function of method that receives two arguments, an Image object
+        and the seed. You can then do whatever you like with the image, including converting it to
+        different formats and manipulating it. For example:
+
+            def process_image(image,seed):
+                image.save(f{'images/seed.png'})
+
+        The callback used by the prompt2png() can be found in ldm/dream_util.py. It contains code
+        to create the requested output directory, select a unique informative name for each image, and
+        write the prompt into the PNG metadata.
+        """
+        # TODO: convert this into a getattr() loop
+        steps                 = steps      or self.steps
+        width                 = width      or self.width
+        height                = height     or self.height
+        seamless              = seamless   or self.seamless
+        cfg_scale             = cfg_scale  or self.cfg_scale
+        ddim_eta              = ddim_eta   or self.ddim_eta
+        iterations            = iterations or self.iterations
+        strength              = strength   or self.strength
+        self.seed             = seed
+        self.log_tokenization = log_tokenization
+        with_variations = [] if with_variations is None else with_variations
+
+        model = (
+            self.load_model()
+        )  # will instantiate the model or return it from cache
+
+        for m in model.modules():
+            if isinstance(m, (nn.Conv2d, nn.ConvTranspose2d)):
+                m.padding_mode = 'circular' if seamless else m._orig_padding_mode
+        
+        assert cfg_scale > 1.0, 'CFG_Scale (-C) must be >1.0'
+        assert (
+            0.0 < strength < 1.0
+        ), 'img2img and inpaint strength can only work with 0.0 < strength < 1.0'
+        assert (
+                0.0 <= variation_amount <= 1.0
+        ), '-v --variation_amount must be in [0.0, 1.0]'
+
+        # check this logic - doesn't look right
+        if len(with_variations) > 0 or variation_amount > 1.0:
+            assert seed is not None,\
+                'seed must be specified when using with_variations'
+            if variation_amount == 0.0:
+                assert iterations == 1,\
+                    'when using --with_variations, multiple iterations are only possible when using --variation_amount'
+            assert all(0 <= weight <= 1 for _, weight in with_variations),\
+                f'variation weights must be in [0.0, 1.0]: got {[weight for _, weight in with_variations]}'
+
+        width, height, _ = self._resolution_check(width, height, log=True)
+
+        if sampler_name and (sampler_name != self.sampler_name):
+            self.sampler_name = sampler_name
+            self._set_sampler()
+
+        tic = time.time()
+        if torch.cuda.is_available():
+            torch.cuda.reset_peak_memory_stats()
+
+        results          = list()
+        init_image       = None
+        mask_image       = None
+
+        try:
+            uc, c = get_uc_and_c(
+                prompt, model=self.model,
+                skip_normalize=skip_normalize,
+                log_tokens=self.log_tokenization
+            )
+
+            (init_image,mask_image) = self._make_images(init_img,init_mask, width, height, fit)
+            
+            if (init_image is not None) and (mask_image is not None):
+                generator = self._make_inpaint()
+            elif init_image is not None:
+                generator = self._make_img2img()
+            else:
+                generator = self._make_txt2img()
+
+            generator.set_variation(self.seed, variation_amount, with_variations)
+            results = generator.generateWithCount(
+                prompt,
+                iterations     = iterations,
+                seed           = self.seed,
+                sampler        = self.sampler,
+                steps          = steps,
+                cfg_scale      = cfg_scale,
+                conditioning   = (uc,c),
+                ddim_eta       = ddim_eta,
+                image_callback = image_callback,  # called after the final image is generated
+                step_callback  = step_callback,   # called after each intermediate image is generated
+                width          = width,
+                height         = height,
+                init_image     = init_image,      # notice that init_image is different from init_img
+                mask_image     = mask_image,
+                strength       = strength,
+                currentCount   = currentCount + 1,
+            )
+
+            if upscale is not None or gfpgan_strength > 0:
+                self.upscale_and_reconstruct(results,
+                                             upscale        = upscale,
+                                             strength       = gfpgan_strength,
+                                             save_original  = save_original,
+                                             image_callback = image_callback,
+                                             currentCount = currentCount + 1)
+
+        except KeyboardInterrupt:
+            print('*interrupted*')
+            if not self.ignore_ctrl_c:
+                raise KeyboardInterrupt
+            print(
+                '>> Partial results will be returned; if --grid was requested, nothing will be returned.'
+            )
+        except RuntimeError as e:
+            print(traceback.format_exc(), file=sys.stderr)
+            print('>> Could not generate image.')
+
+        toc = time.time()
+        print('>> Usage stats:')
+        print(
+            f'>>   {len(results)} image(s) generated in', '%4.2fs' % (toc - tic)
+        )
+        if torch.cuda.is_available() and self.device.type == 'cuda':
+            print(
+                f'>>   Max VRAM used for this generation:',
+                '%4.2fG.' % (torch.cuda.max_memory_allocated() / 1e9),
+                'Current VRAM utilization:'
+                '%4.2fG' % (torch.cuda.memory_allocated() / 1e9),
+            )
+
+            self.session_peakmem = max(
+                self.session_peakmem, torch.cuda.max_memory_allocated()
+            )
+            print(
+                f'>>   Max VRAM used since script start: ',
+                '%4.2fG' % (self.session_peakmem / 1e9),
+            )
+        return results
+
     def _make_images(self, img_path, mask_path, width, height, fit=False):
         init_image      = None
         init_mask       = None

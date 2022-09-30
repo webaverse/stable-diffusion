@@ -6,7 +6,7 @@ import shlex
 import os
 import re
 import sys
-from ldm.dream.model_leader import load_models
+from ldm.dream.model_leader import get_model, load_models
 from ldm.dream.pngwriter import PngWriter, PromptFormatter
 from ldm.dream.server import DreamServer, ThreadingDreamServer
 from ldm.dream.image_util import make_grid
@@ -66,7 +66,7 @@ def main():
     if opt.web:
         dream_server_loop(opt.host, opt.port, opt.outdir)
     else:
-        main_loop(None, opt.outdir, opt.prompt_as_dir, cmd_parser, infile)
+        main_loop(get_model('stable-diffusion-1.4', None), opt.outdir, opt.prompt_as_dir, cmd_parser, infile)
 
 
 def main_loop(t2i, outdir, prompt_as_dir, parser, infile):
