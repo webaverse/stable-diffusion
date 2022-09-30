@@ -163,3 +163,39 @@ Original portions of the software are Copyright (c) 2020 Lincoln D. Stein (https
 
 Please see the original README for more information on this software
 and underlying algorithm, located in the file [README-CompViz.md](docs/README-CompViz.md).
+
+# How to use the --web
+
+The --web opens a webserver, that has a main ui, a database viewer and some headless routes
+The main ui has options to generate images and shows the results.! (/)
+![Screenshot_45](https://user-images.githubusercontent.com/45359358/193286613-519981a4-06e6-439d-bbfd-bf6d77c560ad.png)
+
+The database viewer, can fetch old generations and their parameters and result (/db)
+![Screenshot_42](https://user-images.githubusercontent.com/45359358/193286836-60ec6461-626b-4214-b1f6-88b07edecb65.png)
+
+There are () other routes:
+ * /image (get) 
+   * arguments: s (prompt), id (model id, can be left out to use default model) 
+   * generates an image
+   * example: 127.0.0.1/image?s=cat&id=sd_v1.4
+ * /image_mass (get) 
+   * arguments: s (prompt), id (model id, can be left out to use default model), count (how many images to generate)
+   * generates multiple images and returns a zip file
+   * example: 127.0.0.1/image_mass?s=cat&id=sd_v1.4&count=4
+ * /mod (get) 
+   * arguments: s (prompt), id (model id, can be left out to use default model), color (the hex id for the colour to use, can be left to use white colour as default)
+   * image to image generation
+   * example: 127.0.0.1/mod?s=cat&id=sd_v1.4&color=03fce3
+ * /mod_mass (get)
+   * arguments: s (prompt), id (model id, can be left out to use default model), color (the hex id for the colour to use, can be left to use white colour as default), count (how many images to generate)
+   * generates multiple image 2 image and returns a zip
+   * example: 127.0.0.1/mod_mass?s=cat&id=sd_v1.4&color=03fce3&count=4
+ * /mod (set)
+   * arguments: s (prompt), id (model id, can be left out to use default model)
+   * is used for image to image, it needs an image as the body request
+ * /mod_mass(set)
+   * arguments: s (prompt), id (model id, can be left out to use default model), count (how many generations it will do)
+   * is used for image to image, it needs an image as the body request and returns a zip with all the generated images
+ * /load_db (get)
+   * arguments: count (can be left out, to get all data)
+   * returns old generations (results & parameters)
