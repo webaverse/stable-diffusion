@@ -149,10 +149,8 @@ class DreamServer(BaseHTTPRequestHandler):
 
             content_length = int(self.headers['Content-Length'])
             post_data = json.loads(self.rfile.read(content_length))
-            embedding_path = post_data['embedding_path']
-            if len(embedding_path) == 0:
-                embedding_path = None
-            model = get_model(post_data['id'], embedding_path, self.address_string())
+            model = get_model(post_data['id'], self.address_string())
+            model.load_textual_inversion_embeddings()
             opt = build_opt(post_data, model.seed, gfpgan_model_exists)
             print(opt)
 

@@ -80,6 +80,7 @@ def convert_img(image):
     return 2.*image - 1.
 
 def renderImage(self, data, _model):
+    _model.load_textual_inversion_embeddings()
     self.send_response(200)
     self.send_header("Access-Control-Allow-Origin", "*")
     self.send_header('Content-type', 'image/png')
@@ -99,6 +100,7 @@ def renderImage(self, data, _model):
 
 
 def renderImageMass(self, data, _model, count):
+    _model.load_textual_inversion_embeddings()
     self.send_response(200)
     self.send_header("Access-Control-Allow-Origin", "*")
     self.send_header('Content-type', 'application/zip')
@@ -138,6 +140,7 @@ def renderImageMass(self, data, _model, count):
 
 
 def renderModImage(self, init_image, data, strength, steps, _model):  
+    _model.load_textual_inversion_embeddings()
     self.send_response(200)
     self.send_header("Access-Control-Allow-Origin", "*")
     self.send_header('Content-type', 'image/png')
@@ -162,6 +165,7 @@ def renderModImage(self, init_image, data, strength, steps, _model):
         os.remove("./img2img-tmp.png")
 
 def renderModImageMass(self, init_image, data, strength, steps, _model, count):
+    _model.load_textual_inversion_embeddings()
     self.send_response(200)
     self.send_header("Access-Control-Allow-Origin", "*")
     self.send_header('Content-type', 'application/zip')
@@ -211,17 +215,13 @@ def do_get(self):
     if "id" in query_components:
         id = query_components["id"]
 
-    embedding_path = None
-    if "embedding_path" in query_components:
-        embedding_path = query_components["embedding_path"]
-
     if s is None or s == "":
         self.send_response(404)
         self.end_headers()
         return
     
     prompt = s
-    model = get_model(id, embedding_path, self.address_string())
+    model = get_model(id, self.address_string())
     renderImage(self, prompt, model)
     return
 
@@ -233,10 +233,6 @@ def do_get_image_mass(self):
     if "id" in query_components:
         id = query_components["id"]
 
-    embedding_path = None
-    if "embedding_path" in query_components:
-        embedding_path = query_components["embedding_path"]
-
     if s is None or s == "":
         self.send_response(404)
         self.end_headers()
@@ -247,7 +243,7 @@ def do_get_image_mass(self):
         count = int(query_components['count'])
 
     prompt = s
-    model = get_model(id, embedding_path, self.address_string())
+    model = get_model(id, self.address_string())
     renderImageMass(self, prompt, model, count)
     return
 
@@ -259,10 +255,6 @@ def do_get_mod(self):
     if "id" in query_components:
         id = query_components["id"]
 
-    embedding_path = None
-    if "embedding_path" in query_components:
-        embedding_path = query_components["embedding_path"]
-
     if s is None or s == "":
         self.send_response(404)
         self.end_headers()
@@ -282,7 +274,7 @@ def do_get_mod(self):
     
     color_tuple = hex_color_string_to_tuple(color)
     init_image = create_img(512, 512, color_tuple)
-    model = get_model(id, embedding_path, self.address_string())
+    model = get_model(id, self.address_string())
     renderModImage(self, init_image, s, strength, steps, model)
     return
 
@@ -293,10 +285,6 @@ def do_get_mod_image_mass(self):
     id = default_model
     if "id" in query_components:
         id = query_components["id"]
-
-    embedding_path = None
-    if "embedding_path" in query_components:
-        embedding_path = query_components["embedding_path"]
 
     if s is None or s == "":
         self.send_response(404)
@@ -321,7 +309,7 @@ def do_get_mod_image_mass(self):
     
     color_tuple = hex_color_string_to_tuple(color)
     init_image = create_img(512, 512, color_tuple)
-    model = get_model(id, embedding_path, self.address_string())
+    model = get_model(id, self.address_string())
     renderModImageMass(self, init_image, s, strength, steps, model, count)
     return
 
@@ -334,10 +322,6 @@ def do_post_mod(self):
     if "id" in query_components:
         id = query_components["id"]
 
-    embedding_path = None
-    if "embedding_path" in query_components:
-        embedding_path = query_components["embedding_path"]
-
     if s is None or s == "":
         self.send_response(404)
         self.end_headers()
@@ -354,7 +338,7 @@ def do_post_mod(self):
     content_length = int(self.headers['Content-Length'])
     post_data = json.loads(self.rfile.read(content_length))
 
-    model = get_model(id, embedding_path, self.address_string())
+    model = get_model(id, self.address_string())
     renderModImage(self, post_data['init_image'], s, strength, steps, model)
 
 def do_post_mod_mass(self):
@@ -364,10 +348,6 @@ def do_post_mod_mass(self):
     id = default_model
     if "id" in query_components:
         id = query_components["id"]
-
-    embedding_path = None
-    if "embedding_path" in query_components:
-        embedding_path = query_components["embedding_path"]
 
     if s is None or s == "":
         self.send_response(404)
@@ -389,7 +369,7 @@ def do_post_mod_mass(self):
     content_length = int(self.headers['Content-Length'])
     post_data = json.loads(self.rfile.read(content_length))
 
-    model = get_model(id, embedding_path, self.address_string())
+    model = get_model(id, self.address_string())
     renderModImageMass(self, post_data['init_image'], s, strength, steps, model, count)
 
 def do_get_db(self):
