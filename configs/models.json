@@ -1,0 +1,17 @@
+[
+  {
+    "id": "stable-diffusion-1.4",
+    "name": "models/ldm/stable-diffusion-v1/model.ckpt",
+    "config": "configs/stable-diffusion/v1-inference.yaml",
+    "data": {
+      "width": 512,
+      "height": 512,
+      "sampler_name": "k_lms",
+      "full_precision": false,
+      "grid": false,
+      "seamless": false,
+      "device_type": "cuda",
+      "infile": null
+    }
+  }
+]
