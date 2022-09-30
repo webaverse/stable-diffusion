@@ -119,12 +119,12 @@ def renderImageMass(self, data, _model, count):
                 for name in dirs:
                     os.rmdir(os.path.join(root, name))
             os.rmdir(folderName)
-            data = []
+            _data = []
             with open(zipFileName + '.zip', 'rb') as f:
-                data = io.BytesIO(f.read())
+                _data = io.BytesIO(f.read())
             
             os.remove(zipFileName + '.zip')
-            self.wfile.write(data.read())
+            self.wfile.write(_data.read())
             return
 
         _model.prompt2imageWithCount(**vars(opt), step_callback=image_progress, image_callback=image_done, currentCount=currentCount)
@@ -182,12 +182,12 @@ def renderModImageMass(self, init_image, data, strength, steps, _model, count):
                 for name in dirs:
                     os.rmdir(os.path.join(root, name))
             os.rmdir(folderName)
-            data = []
+            _data = []
             with open(zipFileName + '.zip', 'rb') as f:
-                data = io.BytesIO(f.read())
+                _data = io.BytesIO(f.read())
             
             os.remove(zipFileName + '.zip')
-            self.wfile.write(data.read())
+            self.wfile.write(_data.read())
             return
 
         _model.prompt2imageWithCount(**vars(opt), step_callback=image_progress, image_callback=image_done, currentCount=currentCount)
