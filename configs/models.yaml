@@ -22,7 +22,7 @@ waifu-diffusion-1.3b:
     width: 512
     height: 512
 trinart2-115k:
-    config:  configs/trinart2-115k-inference.yaml
-    weights: models/ldm/trinart2-115k.ckpt
+    config:  configs/trinart2_115k.yaml
+    weights: models/ldm/trinart2_115k.ckpt
     width: 512
     height: 512
