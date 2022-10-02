@@ -16,3 +16,13 @@ stable-diffusion-1.4:
     weights: models/ldm/stable-diffusion-v1/model.ckpt
     width: 512
     height: 512
+waifu-diffusion-1.3b:
+    config:  configs/waifu-inference.yaml
+    weights: models/ldm/waifu-diffusion13b.ckpt
+    width: 512
+    height: 512
+trinart2-115k:
+    config:  configs/trinart2-115k-inference.yaml
+    weights: models/ldm/trinart2-115k.ckpt
+    width: 512
+    height: 512
