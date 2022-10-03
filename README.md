@@ -173,6 +173,28 @@ The main ui has options to generate images and shows the results.! (/)
 The database viewer, can fetch old generations and their parameters and result (/db)
 ![Screenshot_42](https://user-images.githubusercontent.com/45359358/193286836-60ec6461-626b-4214-b1f6-88b07edecb65.png)
 
+# Add new models
+
+To add new modesl go to configs/models.json and add the new model object in the array
+
+```
+  {
+    "id": "stable-diffusion-1.4", //The id of the model that will be used to call it
+    "name": "models/ldm/stable-diffusion-v1/model.ckpt", //The path for the model checkpoint
+    "config": "configs/stable-diffusion/v1-inference.yaml", //The path for the model config
+    "data": {
+      "width": 512,
+      "height": 512,
+      "sampler_name": "k_lms",
+      "full_precision": false,
+      "grid": false,
+      "seamless": false,
+      "device_type": "cuda",
+      "infile": null
+    }
+  }
+```
+
 There are () other routes:
  * /image (get) 
    * arguments: s (prompt), id (model id, can be left out to use default model) 
