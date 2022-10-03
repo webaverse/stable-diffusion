@@ -10,6 +10,7 @@ from ldm.dream.pngwriter import PngWriter, PromptFormatter
 from threading import Event
 from ldm.dream.text2img_server import do_get, do_get_db, do_get_image_mass, do_get_load_db, do_get_mod, do_get_mod_image_mass, do_post_mod, do_post_mod_mass
 from ldm.db_logger import addQuery
+from ldm.requestQueue import getIsRunning, setIsRunning
 
 def build_opt(post_data, seed, gfpgan_model_exists):
     opt = argparse.Namespace()
@@ -140,6 +141,10 @@ class DreamServer(BaseHTTPRequestHandler):
         elif self.path.startswith("/mod"):
             do_post_mod(self)
         else:
+            while(getIsRunning()):
+                pass
+            
+            setIsRunning('True')
             self.send_response(200)
             self.send_header("Content-type", "application/json")
             self.end_headers()
@@ -197,6 +202,7 @@ class DreamServer(BaseHTTPRequestHandler):
                     self.wfile.write(bytes(json.dumps(
                         {'event': 'result', 'url': path, 'seed': seed, 'config': config}
                     ) + '\n',"utf-8"))
+                setIsRunning('False')
 
                 # control state of the "postprocessing..." message
                 upscaling_requested = opt.upscale or opt.gfpgan_strength > 0

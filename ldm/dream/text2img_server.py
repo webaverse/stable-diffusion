@@ -2,6 +2,7 @@ import argparse
 from datetime import datetime
 import json
 import shutil
+from time import time
 from urllib.parse import urlparse
 from ldm.dream.model_leader import get_model
 from ldm.db_logger import addQuery, getQueries
@@ -11,6 +12,8 @@ import numpy as np
 import io
 import PIL
 import os
+from ldm.requestQueue import setIsRunning, getIsRunning
+import threading
 
 device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
 batch_size = 3
@@ -80,6 +83,8 @@ def convert_img(image):
     return 2.*image - 1.
 
 def renderImage(self, data, _model):
+    print('RENDERING IMAGE current ('+json.dumps(data)+') thread:', threading.currentThread().getName())
+    print('TYYYYYYYYYYYYPE:', type(self.wfile))
     _model.load_textual_inversion_embeddings()
     self.send_response(200)
     self.send_header("Access-Control-Allow-Origin", "*")
@@ -220,9 +225,13 @@ def do_get(self):
         self.end_headers()
         return
     
-    prompt = s
+    while(getIsRunning()):
+        pass
+    
+    setIsRunning('True')
     model = get_model(id, self.address_string())
-    renderImage(self, prompt, model)
+    renderImage(self, s, model)
+    setIsRunning('False')
     return
 
 def do_get_image_mass(self):
@@ -242,9 +251,14 @@ def do_get_image_mass(self):
     if 'count' in query_components:
         count = int(query_components['count'])
 
+    while(getIsRunning()):
+        pass
+    
+    setIsRunning('True')
     prompt = s
     model = get_model(id, self.address_string())
     renderImageMass(self, prompt, model, count)
+    setIsRunning('False')
     return
 
 def do_get_mod(self):
@@ -274,8 +288,14 @@ def do_get_mod(self):
     
     color_tuple = hex_color_string_to_tuple(color)
     init_image = create_img(512, 512, color_tuple)
+    
+    while(getIsRunning()):
+        pass
+    
+    setIsRunning('True')
     model = get_model(id, self.address_string())
     renderModImage(self, init_image, s, strength, steps, model)
+    setIsRunning('False')
     return
 
 def do_get_mod_image_mass(self):
@@ -309,8 +329,14 @@ def do_get_mod_image_mass(self):
     
     color_tuple = hex_color_string_to_tuple(color)
     init_image = create_img(512, 512, color_tuple)
+    
+    while(getIsRunning()):
+        pass
+    
+    setIsRunning('True')
     model = get_model(id, self.address_string())
     renderModImageMass(self, init_image, s, strength, steps, model, count)
+    setIsRunning('False')
     return
 
 
@@ -338,8 +364,14 @@ def do_post_mod(self):
     content_length = int(self.headers['Content-Length'])
     post_data = json.loads(self.rfile.read(content_length))
 
+    while(getIsRunning()):
+        pass
+    
+    setIsRunning('True')
     model = get_model(id, self.address_string())
     renderModImage(self, post_data['init_image'], s, strength, steps, model)
+    setIsRunning('False')
+    return
 
 def do_post_mod_mass(self):
     query = urlparse(self.path).query
@@ -368,9 +400,14 @@ def do_post_mod_mass(self):
         
     content_length = int(self.headers['Content-Length'])
     post_data = json.loads(self.rfile.read(content_length))
-
+ 
+    while(getIsRunning()):
+        pass
+    
+    setIsRunning('True')
     model = get_model(id, self.address_string())
     renderModImageMass(self, post_data['init_image'], s, strength, steps, model, count)
+    setIsRunning('False')
 
 def do_get_db(self):
     self.send_response(200)
