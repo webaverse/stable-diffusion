@@ -164,15 +164,6 @@ Original portions of the software are Copyright (c) 2020 Lincoln D. Stein (https
 Please see the original README for more information on this software
 and underlying algorithm, located in the file [README-CompViz.md](docs/README-CompViz.md).
 
-# How to use the --web
-
-The --web opens a webserver, that has a main ui, a database viewer and some headless routes
-The main ui has options to generate images and shows the results.! (/)
-![Screenshot_45](https://user-images.githubusercontent.com/45359358/193286613-519981a4-06e6-439d-bbfd-bf6d77c560ad.png)
-
-The database viewer, can fetch old generations and their parameters and result (/db)
-![Screenshot_42](https://user-images.githubusercontent.com/45359358/193286836-60ec6461-626b-4214-b1f6-88b07edecb65.png)
-
 # Add new models
 
 To add new modesl go to configs/models.json and add the new model object in the array
@@ -194,6 +185,15 @@ To add new modesl go to configs/models.json and add the new model object in the 
     }
   }
 ```
+
+# How to use the --web
+
+The --web opens a webserver, that has a main ui, a database viewer and some headless routes
+The main ui has options to generate images and shows the results.! (/)
+![Screenshot_45](https://user-images.githubusercontent.com/45359358/193286613-519981a4-06e6-439d-bbfd-bf6d77c560ad.png)
+
+The database viewer, can fetch old generations and their parameters and result (/db)
+![Screenshot_42](https://user-images.githubusercontent.com/45359358/193286836-60ec6461-626b-4214-b1f6-88b07edecb65.png)
 
 There are () other routes:
  * /image (get) 
