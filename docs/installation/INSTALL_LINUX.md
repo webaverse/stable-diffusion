@@ -81,6 +81,8 @@ Now run the following commands from within the stable-diffusion directory. This 
 
 9. Subsequently, to relaunch the script, be sure to run "conda activate ldm" (step 5, second command), enter the `stable-diffusion` directory, and then launch the dream script (step 8). If you forget to activate the ldm environment, the script will fail with multiple `ModuleNotFound` errors.
 
+10. Instal redis or run the docker compose in dockers/ folder, using docker-compose up -d, rename the .env-default to .env and set the redis credentials based on your installation
+
 ### Updating to newer versions of the script
 
 This distribution is changing rapidly. If you used the `git clone` method (step 5) to download the stable-diffusion directory, then to update to the latest and greatest version, launch the Anaconda window, enter `stable-diffusion` and type:
