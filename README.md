@@ -1,39 +1,6 @@
-<h1 align='center'><b>InvokeAI: A Stable Diffusion Toolkit</b></h1>
+<h1 align='center'><b>Webaverse Stable Diffusion Toolkit</b></h1> 
 
-<p align='center'>
-<img src="docs/assets/logo.png"/>
-</p>
-
-<p align="center">
-    <img src="https://img.shields.io/github/last-commit/invoke-ai/InvokeAI?logo=Python&logoColor=green&style=for-the-badge" alt="last-commit"/>
-    <img src="https://img.shields.io/github/stars/invoke-ai/InvokeAI?logo=GitHub&style=for-the-badge" alt="stars"/>
-    <br>
-    <img src="https://img.shields.io/github/issues/invoke-ai/InvokeAI?logo=GitHub&style=for-the-badge" alt="issues"/>
-    <img src="https://img.shields.io/github/issues-pr/invoke-ai/InvokeAI?logo=GitHub&style=for-the-badge" alt="pull-requests"/>
-</p>
-
-This is a fork of
-[CompVis/stable-diffusion](https://github.com/CompVis/stable-diffusion),
-the open source text-to-image generator. It provides a streamlined
-process with various new features and options to aid the image
-generation process. It runs on Windows, Mac and Linux machines,
-and runs on GPU cards with as little as 4 GB or RAM.
-
-_Note: This fork is rapidly evolving. Please use the
-[Issues](https://github.com/invoke-ai/InvokeAI/issues) tab to
-report bugs and make feature requests. Be sure to use the provided
-templates. They will help aid diagnose issues faster._
-
-_This repository was formally known as /stable-diffusion_
-
-# **Table of Contents**
-
-1. [Installation](#installation)
-2. [Major Features](#features)
-3. [Changelog](#latest-changes)
-4. [Troubleshooting](#troubleshooting)
-5. [Contributing](#contributing)
-6. [Support](#support)
+Fork of InvokeAI's fork of Stable Diffusion by CompVis and RunwayML.
 
 # Installation
 
@@ -42,6 +9,46 @@ This fork is supported across multiple platforms. You can find individual instal
 - ## [Linux](docs/installation/INSTALL_LINUX.md)
 - ## [Windows](docs/installation/INSTALL_WINDOWS.md)
 - ## [Macintosh](docs/installation/INSTALL_MAC.md)
+
+# API Usage
+To use the API:
+```js
+// text2img API
+const params = { s: "a group of adventurers meet the lisk" }
+const response = await fetch("https://stable-diffusion.webaverse.com/image",
+{
+    headers: {
+      'Accept': 'application/json',
+      'Content-Type': 'application/json'
+    },
+    method: "GET",
+    params
+})
+
+// img2img API
+const strength = 0.7; // how much should the original image be added to the noise?
+const imageData; // optional imagedata
+const params = { s: "a group of adventurers meet the lisk", strength }
+const response = await fetch("https://stable-diffusion.webaverse.com/mod",
+{
+    method: "POST",
+    body: imageData,
+    params
+})
+
+// inpainting API
+const strength = 0.7; // how much should the original image be added to the noise?
+const inpaintingData = { image, mask }; // image data from canvases
+const params = { s: "a group of adventurers meet the lisk", strength }
+const response = await fetch("https://stable-diffusion.webaverse.com/inpaint",
+{
+    method: "POST",
+    body: inpaintingData,
+    params
+})
+
+
+    ```
 
 ## **Hardware Requirements**
 
@@ -163,3 +170,61 @@ Original portions of the software are Copyright (c) 2020 Lincoln D. Stein (https
 
 Please see the original README for more information on this software
 and underlying algorithm, located in the file [README-CompViz.md](docs/README-CompViz.md).
+
+# Add new models
+
+To add new modesl go to configs/models.json and add the new model object in the array
+
+```
+  {
+    "id": "stable-diffusion-1.4", //The id of the model that will be used to call it
+    "name": "models/ldm/stable-diffusion-v1/model.ckpt", //The path for the model checkpoint
+    "config": "configs/stable-diffusion/v1-inference.yaml", //The path for the model config
+    "data": {
+      "width": 512,
+      "height": 512,
+      "sampler_name": "k_lms",
+      "full_precision": false,
+      "grid": false,
+      "seamless": false,
+      "device_type": "cuda",
+      "infile": null
+    }
+  }
+```
+
+# How to use the --web
+
+The --web opens a webserver, that has a main ui, a database viewer and some headless routes
+The main ui has options to generate images and shows the results.! (/)
+![Screenshot_45](https://user-images.githubusercontent.com/45359358/193286613-519981a4-06e6-439d-bbfd-bf6d77c560ad.png)
+
+The database viewer, can fetch old generations and their parameters and result (/db)
+![Screenshot_42](https://user-images.githubusercontent.com/45359358/193286836-60ec6461-626b-4214-b1f6-88b07edecb65.png)
+
+There are () other routes:
+ * /image (get) 
+   * arguments: s (prompt), id (model id, can be left out to use default model) 
+   * generates an image
+   * example: 127.0.0.1/image?s=cat&id=sd_v1.4
+ * /image_mass (get) 
+   * arguments: s (prompt), id (model id, can be left out to use default model), count (how many images to generate)
+   * generates multiple images and returns a zip file
+   * example: 127.0.0.1/image_mass?s=cat&id=sd_v1.4&count=4
+ * /mod (get) 
+   * arguments: s (prompt), id (model id, can be left out to use default model), color (the hex id for the colour to use, can be left to use white colour as default)
+   * image to image generation
+   * example: 127.0.0.1/mod?s=cat&id=sd_v1.4&color=03fce3
+ * /mod_mass (get)
+   * arguments: s (prompt), id (model id, can be left out to use default model), color (the hex id for the colour to use, can be left to use white colour as default), count (how many images to generate)
+   * generates multiple image 2 image and returns a zip
+   * example: 127.0.0.1/mod_mass?s=cat&id=sd_v1.4&color=03fce3&count=4
+ * /mod (set)
+   * arguments: s (prompt), id (model id, can be left out to use default model)
+   * is used for image to image, it needs an image as the body request
+ * /mod_mass(set)
+   * arguments: s (prompt), id (model id, can be left out to use default model), count (how many generations it will do)
+   * is used for image to image, it needs an image as the body request and returns a zip with all the generated images
+ * /load_db (get)
+   * arguments: count (can be left out, to get all data)
+   * returns old generations (results & parameters)

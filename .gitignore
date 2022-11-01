@@ -188,3 +188,4 @@ checkpoints
 .DS_Store
 
 embeddings/
+db.sqlite3
