@@ -1,39 +1,19 @@
-<h1 align='center'><b>InvokeAI: A Stable Diffusion Toolkit</b></h1>
+<h1 align='center'><b>Webaverse Stable Diffusion Toolkit</b></h1> 
 
-<p align='center'>
-<img src="docs/assets/logo.png"/>
-</p>
+Fork of InvokeAI's fork of Stable Diffusion by CompVis and RunwayML.
 
-<p align="center">
-    <img src="https://img.shields.io/github/last-commit/invoke-ai/InvokeAI?logo=Python&logoColor=green&style=for-the-badge" alt="last-commit"/>
-    <img src="https://img.shields.io/github/stars/invoke-ai/InvokeAI?logo=GitHub&style=for-the-badge" alt="stars"/>
-    <br>
-    <img src="https://img.shields.io/github/issues/invoke-ai/InvokeAI?logo=GitHub&style=for-the-badge" alt="issues"/>
-    <img src="https://img.shields.io/github/issues-pr/invoke-ai/InvokeAI?logo=GitHub&style=for-the-badge" alt="pull-requests"/>
-</p>
+#
 
-This is a fork of
-[CompVis/stable-diffusion](https://github.com/CompVis/stable-diffusion),
-the open source text-to-image generator. It provides a streamlined
-process with various new features and options to aid the image
-generation process. It runs on Windows, Mac and Linux machines,
-and runs on GPU cards with as little as 4 GB or RAM.
-
-_Note: This fork is rapidly evolving. Please use the
-[Issues](https://github.com/invoke-ai/InvokeAI/issues) tab to
-report bugs and make feature requests. Be sure to use the provided
-templates. They will help aid diagnose issues faster._
-
-_This repository was formally known as /stable-diffusion_
-
-# **Table of Contents**
-
-1. [Installation](#installation)
-2. [Major Features](#features)
-3. [Changelog](#latest-changes)
-4. [Troubleshooting](#troubleshooting)
-5. [Contributing](#contributing)
-6. [Support](#support)
+axios
+    .post("https://stable-diffusion.webaverse.com/mod", rawBody, {
+      params: { s },
+      headers: { "Access-Control-Allow-Origin": "*" },
+      responseType: "arraybuffer",
+    })
+    .then((response) => {
+      console.log("sending response");
+      res.send(response.data);
+    })
 
 # Installation
 
@@ -42,6 +22,46 @@ This fork is supported across multiple platforms. You can find individual instal
 - ## [Linux](docs/installation/INSTALL_LINUX.md)
 - ## [Windows](docs/installation/INSTALL_WINDOWS.md)
 - ## [Macintosh](docs/installation/INSTALL_MAC.md)
+
+# API Usage
+To use the API:
+```js
+// text2img API
+const params = { s: "a group of adventurers meet the lisk" }
+const response = await fetch("https://stable-diffusion.webaverse.com/image",
+{
+    headers: {
+      'Accept': 'application/json',
+      'Content-Type': 'application/json'
+    },
+    method: "GET",
+    params
+})
+
+// img2img API
+const strength = 0.7; // how much should the original image be added to the noise?
+const imageData; // optional imagedata
+const params = { s: "a group of adventurers meet the lisk", strength }
+const response = await fetch("https://stable-diffusion.webaverse.com/mod",
+{
+    method: "POST",
+    body: imageData,
+    params
+})
+
+// inpainting API
+const strength = 0.7; // how much should the original image be added to the noise?
+const inpaintingData = { image, mask }; // image data from canvases
+const params = { s: "a group of adventurers meet the lisk", strength }
+const response = await fetch("https://stable-diffusion.webaverse.com/inpaint",
+{
+    method: "POST",
+    body: inpaintingData,
+    params
+})
+
+
+    ```
 
 ## **Hardware Requirements**
 
