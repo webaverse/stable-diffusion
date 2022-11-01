@@ -2,19 +2,6 @@
 
 Fork of InvokeAI's fork of Stable Diffusion by CompVis and RunwayML.
 
-#
-
-axios
-    .post("https://stable-diffusion.webaverse.com/mod", rawBody, {
-      params: { s },
-      headers: { "Access-Control-Allow-Origin": "*" },
-      responseType: "arraybuffer",
-    })
-    .then((response) => {
-      console.log("sending response");
-      res.send(response.data);
-    })
-
 # Installation
 
 This fork is supported across multiple platforms. You can find individual installation instructions below.
