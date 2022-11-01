@@ -28,6 +28,7 @@ from ldm.dream.image_util          import InitImageResizer
 from ldm.dream.devices             import choose_torch_device
 from ldm.dream.conditioning        import get_uc_and_c
 
+device = torch.device('cuda')
 """Simplified text to image API for stable diffusion/latent diffusion
 
 Example Usage:
@@ -374,6 +375,245 @@ class Generate:
             )
         return results
 
+    def upscale_and_reconstructWithCount(self,
+                                image_list,
+                                upscale       = None,
+                                strength      =  0.0,
+                                save_original = False,
+                                image_callback = None,
+                                currentCount   = 1):
+        try:
+            if upscale is not None:
+                from ldm.gfpgan.gfpgan_tools import real_esrgan_upscale
+            if strength > 0:
+                from ldm.gfpgan.gfpgan_tools import run_gfpgan
+        except (ModuleNotFoundError, ImportError):
+            print(traceback.format_exc(), file=sys.stderr)
+            print('>> You may need to install the ESRGAN and/or GFPGAN modules')
+            return
+            
+        for r in image_list:
+            image, seed = r
+            try:
+                if upscale is not None:
+                    if len(upscale) < 2:
+                        upscale.append(0.75)
+                    image = real_esrgan_upscale(
+                        image,
+                        upscale[1],
+                        int(upscale[0]),
+                        seed,
+                    )
+                if strength > 0:
+                    image = run_gfpgan(
+                        image, strength, seed, 1
+                    )
+            except Exception as e:
+                print(
+                    f'>> Error running RealESRGAN or GFPGAN. Your image was not upscaled.\n{e}'
+                )
+
+            if image_callback is not None:
+                image_callback(image, seed, currentCount, upscaled=True)
+            else:
+                r[0] = image
+
+    def prompt2imageWithCount(
+            self,
+            # these are common
+            prompt,
+            iterations     =    None,
+            steps          =    None,
+            seed           =    None,
+            cfg_scale      =    None,
+            ddim_eta       =    None,
+            skip_normalize =    False,
+            image_callback =    None,
+            step_callback  =    None,
+            width          =    None,
+            height         =    None,
+            sampler_name   =    None,
+            seamless       =    False,
+            log_tokenization=  False,
+            with_variations =   None,
+            variation_amount =  0.0,
+            # these are specific to img2img and inpaint
+            init_img       =    None,
+            init_mask      =    None,
+            fit            =    False,
+            strength       =    None,
+            # these are specific to GFPGAN/ESRGAN
+            gfpgan_strength=    0,
+            save_original  =    False,
+            upscale        =    None,
+            currentCount   =    1,
+            **args,
+    ):   # eat up additional cruft
+        """
+        ldm.generate.prompt2image() is the common entry point for txt2img() and img2img()
+        It takes the following arguments:
+           prompt                          // prompt string (no default)
+           iterations                      // iterations (1); image count=iterations
+           steps                           // refinement steps per iteration
+           seed                            // seed for random number generator
+           width                           // width of image, in multiples of 64 (512)
+           height                          // height of image, in multiples of 64 (512)
+           cfg_scale                       // how strongly the prompt influences the image (7.5) (must be >1)
+           seamless                        // whether the generated image should tile
+           init_img                        // path to an initial image
+           strength                        // strength for noising/unnoising init_img. 0.0 preserves image exactly, 1.0 replaces it completely
+           gfpgan_strength                 // strength for GFPGAN. 0.0 preserves image exactly, 1.0 replaces it completely
+           ddim_eta                        // image randomness (eta=0.0 means the same seed always produces the same image)
+           step_callback                   // a function or method that will be called each step
+           image_callback                  // a function or method that will be called each time an image is generated
+           with_variations                 // a weighted list [(seed_1, weight_1), (seed_2, weight_2), ...] of variations which should be applied before doing any generation
+           variation_amount                // optional 0-1 value to slerp from -S noise to random noise (allows variations on an image)
+
+        To use the step callback, define a function that receives two arguments:
+        - Image GPU data
+        - The step number
+
+        To use the image callback, define a function of method that receives two arguments, an Image object
+        and the seed. You can then do whatever you like with the image, including converting it to
+        different formats and manipulating it. For example:
+
+            def process_image(image,seed):
+                image.save(f{'images/seed.png'})
+
+        The callback used by the prompt2png() can be found in ldm/dream_util.py. It contains code
+        to create the requested output directory, select a unique informative name for each image, and
+        write the prompt into the PNG metadata.
+        """
+        # TODO: convert this into a getattr() loop
+        steps                 = steps      or self.steps
+        width                 = width      or self.width
+        height                = height     or self.height
+        seamless              = seamless   or self.seamless
+        cfg_scale             = cfg_scale  or self.cfg_scale
+        ddim_eta              = ddim_eta   or self.ddim_eta
+        iterations            = iterations or self.iterations
+        strength              = strength   or self.strength
+        self.seed             = seed
+        self.log_tokenization = log_tokenization
+        with_variations = [] if with_variations is None else with_variations
+
+        model = (
+            self.load_model()
+        )  # will instantiate the model or return it from cache
+
+        for m in model.modules():
+            if isinstance(m, (nn.Conv2d, nn.ConvTranspose2d)):
+                m.padding_mode = 'circular' if seamless else m._orig_padding_mode
+        
+        assert cfg_scale > 1.0, 'CFG_Scale (-C) must be >1.0'
+        assert (
+            0.0 < strength < 1.0
+        ), 'img2img and inpaint strength can only work with 0.0 < strength < 1.0'
+        assert (
+                0.0 <= variation_amount <= 1.0
+        ), '-v --variation_amount must be in [0.0, 1.0]'
+
+        # check this logic - doesn't look right
+        if len(with_variations) > 0 or variation_amount > 1.0:
+            assert seed is not None,\
+                'seed must be specified when using with_variations'
+            if variation_amount == 0.0:
+                assert iterations == 1,\
+                    'when using --with_variations, multiple iterations are only possible when using --variation_amount'
+            assert all(0 <= weight <= 1 for _, weight in with_variations),\
+                f'variation weights must be in [0.0, 1.0]: got {[weight for _, weight in with_variations]}'
+
+        width, height, _ = self._resolution_check(width, height, log=True)
+
+        if sampler_name and (sampler_name != self.sampler_name):
+            self.sampler_name = sampler_name
+            self._set_sampler()
+
+        tic = time.time()
+        if torch.cuda.is_available():
+            torch.cuda.reset_peak_memory_stats()
+
+        results          = list()
+        init_image       = None
+        mask_image       = None
+
+        try:
+            uc, c = get_uc_and_c(
+                prompt, model=self.model,
+                skip_normalize=skip_normalize,
+                log_tokens=self.log_tokenization
+            )
+
+            (init_image,mask_image) = self._make_images(init_img,init_mask, width, height, fit)
+            
+            if (init_image is not None) and (mask_image is not None):
+                generator = self._make_inpaint()
+            elif init_image is not None:
+                generator = self._make_img2img()
+            else:
+                generator = self._make_txt2img()
+
+            generator.set_variation(self.seed, variation_amount, with_variations)
+            results = generator.generateWithCount(
+                prompt,
+                iterations     = iterations,
+                seed           = self.seed,
+                sampler        = self.sampler,
+                steps          = steps,
+                cfg_scale      = cfg_scale,
+                conditioning   = (uc,c),
+                ddim_eta       = ddim_eta,
+                image_callback = image_callback,  # called after the final image is generated
+                step_callback  = step_callback,   # called after each intermediate image is generated
+                width          = width,
+                height         = height,
+                init_image     = init_image,      # notice that init_image is different from init_img
+                mask_image     = mask_image,
+                strength       = strength,
+                currentCount   = currentCount + 1,
+            )
+
+            if upscale is not None or gfpgan_strength > 0:
+                self.upscale_and_reconstruct(results,
+                                             upscale        = upscale,
+                                             strength       = gfpgan_strength,
+                                             save_original  = save_original,
+                                             image_callback = image_callback,
+                                             currentCount = currentCount + 1)
+
+        except KeyboardInterrupt:
+            print('*interrupted*')
+            if not self.ignore_ctrl_c:
+                raise KeyboardInterrupt
+            print(
+                '>> Partial results will be returned; if --grid was requested, nothing will be returned.'
+            )
+        except RuntimeError as e:
+            print(traceback.format_exc(), file=sys.stderr)
+            print('>> Could not generate image.')
+
+        toc = time.time()
+        print('>> Usage stats:')
+        print(
+            f'>>   {len(results)} image(s) generated in', '%4.2fs' % (toc - tic)
+        )
+        if torch.cuda.is_available() and self.device.type == 'cuda':
+            print(
+                f'>>   Max VRAM used for this generation:',
+                '%4.2fG.' % (torch.cuda.max_memory_allocated() / 1e9),
+                'Current VRAM utilization:'
+                '%4.2fG' % (torch.cuda.memory_allocated() / 1e9),
+            )
+
+            self.session_peakmem = max(
+                self.session_peakmem, torch.cuda.max_memory_allocated()
+            )
+            print(
+                f'>>   Max VRAM used since script start: ',
+                '%4.2fG' % (self.session_peakmem / 1e9),
+            )
+        return results
+
     def _make_images(self, img_path, mask_path, width, height, fit=False):
         init_image      = None
         init_mask       = None
@@ -417,6 +657,101 @@ class Generate:
             self.generators['inpaint'] = Inpaint(self.model)
         return self.generators['inpaint']
 
+
+    ids_lookup = {}
+    word_embeddings = {}
+    word_embeddings_checksums = {}
+    fixes = None
+    comments = []
+    dir_mtime = None
+    layers = None
+    circular_enabled = False
+
+    def load_textual_inversion_embeddings(self):
+        dirname = 'embeddings/'
+        if not os.path.exists(dirname):
+            os.mkdir(dirname)
+        
+        mt = os.path.getmtime(dirname)
+        if self.dir_mtime is not None and mt <= self.dir_mtime:
+            return
+        
+        self.dir_mtime = mt
+        self.ids_lookup.clear()
+        self.word_embeddings.clear()
+
+        tokenizer = self.model.cond_stage_model.tokenizer
+
+        def const_hash(a):
+            r = 0
+            for v in a:
+                r = (r * 281 ^ int(v) * 997) & 0xFFFFFFFF
+            return r
+        
+        def process_file(path, filename):
+            name = os.path.splitext(filename)[0]
+
+            data = torch.load(path, map_location="cpu")
+
+            # textual inversion embeddings
+            if 'string_to_param' in data:
+                param_dict = data['string_to_param']
+                if hasattr(param_dict, '_parameters'):
+                    param_dict = getattr(param_dict, '_parameters')  # fix for torch 1.12.1 loading saved file from torch 1.11
+                assert len(param_dict) == 1, 'embedding file has multiple terms in it'
+                emb = next(iter(param_dict.items()))[1]
+            elif type(data) == dict and type(next(iter(data.values()))) == torch.Tensor:
+                assert len(data.keys()) == 1, 'embedding file has multiple terms in it'
+
+                emb = next(iter(data.values()))
+                if len(emb.shape) == 1:
+                    emb = emb.unsqueeze(0)
+
+            self.word_embeddings[name] = emb.detach().to(device)
+            self.word_embeddings_checksums[name] = f'{const_hash(emb.reshape(-1)*100)&0xffff:04x}'
+
+            ids = tokenizer([name], add_special_tokens=False)['input_ids'][0]
+
+            first_id = ids[0]
+            if first_id not in self.ids_lookup:
+                self.ids_lookup[first_id] = []
+            self.ids_lookup[first_id].append((ids, name))
+
+        for fn in os.listdir(dirname):
+            try:
+                process_file(os.path.join(dirname, fn), fn)
+            except Exception:
+                print(f"Error loading emedding {fn}:", file=sys.stderr)
+                print(traceback.format_exc(), file=sys.stderr)
+                continue
+
+        print(f"Loaded a total of {len(self.word_embeddings)} text inversion embeddings.")
+
+    def hijack(self, m):
+        model_embeddings = m.cond_stage_model.transformer.text_model.embeddings
+
+        model_embeddings.token_embedding = EmbeddingsWithFixes(model_embeddings.token_embedding, self)
+        m.cond_stage_model = FrozenCLIPEmbedderWithCustomWords(m.cond_stage_model, self)
+
+        def flatten(el):
+            flattened = [flatten(children) for children in el.children()]
+            res = [el]
+            for c in flattened:
+                res += c
+            return res
+
+        self.layers = flatten(m)
+
+    def apply_circular(self, enable):
+        if self.circular_enabled == enable:
+            return
+
+        self.circular_enabled = enable
+
+        for layer in [layer for layer in self.layers if type(layer) == torch.nn.Conv2d]:
+            layer.padding_mode = 'circular' if enable else 'zeros'
+            
+
     def load_model(self):
         """Load and initialize the model from configuration variables passed at object creation time"""
         if self.model is None:
@@ -431,6 +766,7 @@ class Generate:
                 self.model = model.to(self.device)
                 # model.to doesn't change the cond_stage_model.device used to move the tokenizer output, so set it here
                 self.model.cond_stage_model.device = self.device
+                self.hijack(self.model)
             except AttributeError as e:
                 print(f'>> Error loading model. {str(e)}', file=sys.stderr)
                 print(traceback.format_exc(), file=sys.stderr)
@@ -693,3 +1029,137 @@ class Generate:
         return width, height, resize_needed
 
 
+class EmbeddingsWithFixes(torch.nn.Module):
+    def __init__(self, wrapped, embeddings):
+        super().__init__()
+        self.wrapped = wrapped
+        self.embeddings = embeddings
+
+    def forward(self, input_ids):
+        batch_fixes = self.embeddings.fixes
+        self.embeddings.fixes = None
+
+        inputs_embeds = self.wrapped(input_ids)
+
+        if batch_fixes is not None:
+            for fixes, tensor in zip(batch_fixes, inputs_embeds):
+                for offset, word in fixes:
+                    emb = self.embeddings.word_embeddings[word]
+                    emb_len = min(tensor.shape[0]-offset-1, emb.shape[0])
+                    tensor[offset+1:offset+1+emb_len] = self.embeddings.word_embeddings[word][0:emb_len]
+
+        return inputs_embeds
+
+class FrozenCLIPEmbedderWithCustomWords(torch.nn.Module):
+    def __init__(self, wrapped, hijack):
+        super().__init__()
+        self.wrapped = wrapped
+        self.hijack = hijack
+        self.tokenizer = wrapped.tokenizer
+        self.max_length = wrapped.max_length
+        self.token_mults = {}
+
+        tokens_with_parens = [(k, v) for k, v in self.tokenizer.get_vocab().items() if '(' in k or ')' in k or '[' in k or ']' in k]
+        for text, ident in tokens_with_parens:
+            mult = 1.0
+            for c in text:
+                if c == '[':
+                    mult /= 1.1
+                if c == ']':
+                    mult *= 1.1
+                if c == '(':
+                    mult *= 1.1
+                if c == ')':
+                    mult /= 1.1
+
+            if mult != 1.0:
+                self.token_mults[ident] = mult
+
+    def forward(self, text):
+        self.hijack.fixes = []
+        self.hijack.comments = []
+        remade_batch_tokens = []
+        id_start = self.wrapped.tokenizer.bos_token_id
+        id_end = self.wrapped.tokenizer.eos_token_id
+        maxlen = self.wrapped.max_length
+        used_custom_terms = []
+
+        cache = {}
+        batch_tokens = self.wrapped.tokenizer(text, truncation=False, add_special_tokens=False)["input_ids"]
+        batch_multipliers = []
+        for tokens in batch_tokens:
+            tuple_tokens = tuple(tokens)
+
+            if tuple_tokens in cache:
+                remade_tokens, fixes, multipliers = cache[tuple_tokens]
+            else:
+                fixes = []
+                remade_tokens = []
+                multipliers = []
+                mult = 1.0
+
+                i = 0
+                while i < len(tokens):
+                    token = tokens[i]
+
+                    possible_matches = self.hijack.ids_lookup.get(token, None)
+
+                    mult_change = None
+                    if mult_change is not None:
+                        mult *= mult_change
+                    elif possible_matches is None:
+                        remade_tokens.append(token)
+                        multipliers.append(mult)
+                    else:
+                        found = False
+                        for ids, word in possible_matches:
+                            if tokens[i:i+len(ids)] == ids:
+                                emb_len = int(self.hijack.word_embeddings[word].shape[0])
+                                fixes.append((len(remade_tokens), word))
+                                remade_tokens += [0] * emb_len
+                                multipliers += [mult] * emb_len
+                                i += len(ids) - 1
+                                found = True
+                                used_custom_terms.append((word, self.hijack.word_embeddings_checksums[word]))
+                                break
+
+                        if not found:
+                            remade_tokens.append(token)
+                            multipliers.append(mult)
+
+                    i += 1
+
+                if len(remade_tokens) > maxlen - 2:
+                    vocab = {v: k for k, v in self.wrapped.tokenizer.get_vocab().items()}
+                    ovf = remade_tokens[maxlen - 2:]
+                    overflowing_words = [vocab.get(int(x), "") for x in ovf]
+                    overflowing_text = self.wrapped.tokenizer.convert_tokens_to_string(''.join(overflowing_words))
+
+                    self.hijack.comments.append(f"Warning: too many input tokens; some ({len(overflowing_words)}) have been truncated:\n{overflowing_text}\n")
+
+                remade_tokens = remade_tokens + [id_end] * (maxlen - 2 - len(remade_tokens))
+                remade_tokens = [id_start] + remade_tokens[0:maxlen-2] + [id_end]
+                cache[tuple_tokens] = (remade_tokens, fixes, multipliers)
+
+            multipliers = multipliers + [1.0] * (maxlen - 2 - len(multipliers))
+            multipliers = [1.0] + multipliers[0:maxlen - 2] + [1.0]
+
+            remade_batch_tokens.append(remade_tokens)
+            self.hijack.fixes.append(fixes)
+            batch_multipliers.append(multipliers)
+
+        if len(used_custom_terms) > 0:
+            self.hijack.comments.append("Used custom terms: " + ", ".join([f'{word} [{checksum}]' for word, checksum in used_custom_terms]))
+
+        tokens = torch.asarray(remade_batch_tokens).to(device)
+        outputs = self.wrapped.transformer(input_ids=tokens)
+        z = outputs
+
+        # restoring original mean is likely not correct, but it seems to work well to prevent artifacts that happen otherwise
+        batch_multipliers = torch.asarray(batch_multipliers).to(device)
+        original_mean = z.mean()
+        z *= batch_multipliers.reshape(batch_multipliers.shape + (1,)).expand(z.shape)
+        new_mean = z.mean()
+        z *= original_mean / new_mean
+
+        return z

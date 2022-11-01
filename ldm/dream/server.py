@@ -8,8 +8,10 @@ from urllib import request
 from ldm.dream.model_leader import get_model
 from ldm.dream.pngwriter import PngWriter, PromptFormatter
 from threading import Event
-from ldm.dream.text2img_server import do_get, do_get_mod, do_post_mod
-    
+from ldm.dream.text2img_server import do_get, do_get_db, do_get_image_mass, do_get_load_db, do_get_mod, do_get_mod_image_mass, do_post_mod, do_post_mod_mass
+from ldm.db_logger import addQuery
+from ldm.requestQueue import getIsRunning, setIsRunning
+
 def build_opt(post_data, seed, gfpgan_model_exists):
     opt = argparse.Namespace()
     setattr(opt, 'prompt', post_data['prompt'])
@@ -104,10 +106,18 @@ class DreamServer(BaseHTTPRequestHandler):
             self.send_header("Content-type", "application/json")
             self.end_headers()
             self.wfile.write(bytes('{}', 'utf8'))
+        elif self.path.startswith("/image_mass"):
+            do_get_image_mass(self)
         elif self.path.startswith("/image"):
            do_get(self)
+        elif self.path.startswith("/mod_mass"):
+            do_get_mod_image_mass(self)
         elif self.path.startswith("/mod"):
             do_get_mod(self)
+        elif self.path.startswith("/db"):
+            do_get_db(self)
+        elif self.path.startswith("/load_db"):
+            do_get_load_db(self)
         else:
             path = "." + self.path
             cwd = os.path.realpath(os.getcwd())
@@ -126,9 +136,15 @@ class DreamServer(BaseHTTPRequestHandler):
                 self.send_response(404)
 
     def do_POST(self):
-        if self.path.startswith("/mod"):
+        if self.path.startswith("/mod_mass"):
+            do_post_mod_mass(self)
+        elif self.path.startswith("/mod"):
             do_post_mod(self)
         else:
+            while(getIsRunning()):
+                pass
+            
+            setIsRunning('True')
             self.send_response(200)
             self.send_header("Content-type", "application/json")
             self.end_headers()
@@ -138,10 +154,8 @@ class DreamServer(BaseHTTPRequestHandler):
 
             content_length = int(self.headers['Content-Length'])
             post_data = json.loads(self.rfile.read(content_length))
-            embedding_path = post_data['embedding_path']
-            if len(embedding_path) == 0:
-                embedding_path = None
-            model = get_model(post_data['id'], embedding_path, self.address_string())
+            model = get_model(post_data['id'], self.address_string())
+            model.load_textual_inversion_embeddings()
             opt = build_opt(post_data, model.seed, gfpgan_model_exists)
             print(opt)
 
@@ -163,6 +177,7 @@ class DreamServer(BaseHTTPRequestHandler):
             # is complete. The upscaling replaces the original file, so the second
             # entry should not be inserted into the image list.
             def image_done(image, seed, upscaled=False):
+                addQuery('ui_generation', image, opt.prompt, opt.init_img, opt.strength, opt.iterations, opt.steps, opt.width, opt.height, opt.seamless, opt.fit, opt.mask, opt.invert_mask, opt.cfg_scale, opt.sampler_name, opt.gfpgan_strength, opt.upscale, opt.progress_images, opt.seed, opt.variation_amount, opt.with_variations)
                 name = f'{prefix}.{seed}.png'
                 iter_opt = argparse.Namespace(**vars(opt)) # copy
                 if opt.variation_amount > 0:
@@ -187,6 +202,7 @@ class DreamServer(BaseHTTPRequestHandler):
                     self.wfile.write(bytes(json.dumps(
                         {'event': 'result', 'url': path, 'seed': seed, 'config': config}
                     ) + '\n',"utf-8"))
+                setIsRunning('False')
 
                 # control state of the "postprocessing..." message
                 upscaling_requested = opt.upscale or opt.gfpgan_strength > 0

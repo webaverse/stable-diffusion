@@ -6,11 +6,14 @@ import shlex
 import os
 import re
 import sys
-from ldm.dream.model_leader import load_models
+from ldm.dream.model_leader import get_model, load_models
 from ldm.dream.pngwriter import PngWriter, PromptFormatter
 from ldm.dream.server import DreamServer, ThreadingDreamServer
 from ldm.dream.image_util import make_grid
 from omegaconf import OmegaConf
+from ldm.db_logger import initDbConnection
+from ldm.requestQueue import initQueue
+from ldm.env_reader import read
 
 # Placeholder to be replaced with proper class that tracks the
 # outputs and associates with the prompt that generated them.
@@ -19,6 +22,9 @@ output_cntr = 0
 
 
 def main():
+    read()
+    initDbConnection()
+    initQueue()
     load_models('./configs/models.json')
     """Initialize command-line parsers and the diffusion model"""
     arg_parser = create_argv_parser()
@@ -66,7 +72,7 @@ def main():
     if opt.web:
         dream_server_loop(opt.host, opt.port, opt.outdir)
     else:
-        main_loop(None, opt.outdir, opt.prompt_as_dir, cmd_parser, infile)
+        main_loop(get_model('stable-diffusion-1.4', None), opt.outdir, opt.prompt_as_dir, cmd_parser, infile)
 
 
 def main_loop(t2i, outdir, prompt_as_dir, parser, infile):
@@ -467,7 +473,7 @@ def create_argv_parser():
     parser.add_argument(
         '--port',
         type=int,
-        default='9090',
+        default='80',
         help='Web server: Port to listen on'
     )
     parser.add_argument(
